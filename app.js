@@ -41,17 +41,18 @@ function jsonp(params, timeoutMs = 9000) {
 }
 
 async function api(action, payload = {}) {
-  const response = await jsonp({ action, payload: encodeURIComponent(JSON.stringify(payload)) });
+  const response = await jsonp({ action, payload: encodeURIComponent(JSON.stringify(payload)), _ts: Date.now() }, 15000);
   if (!response?.ok) throw new Error(response?.error || 'Erreur inconnue');
   return response.data;
 }
 
 let dbPromise;
 function openDB(){if(!('indexedDB' in window))return Promise.resolve(null);if(dbPromise)return dbPromise;dbPromise=new Promise((resolve,reject)=>{const r=indexedDB.open(DB_NAME,DB_VERSION);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(DB_STATE))db.createObjectStore(DB_STATE);if(!db.objectStoreNames.contains(DB_QUEUE))db.createObjectStore(DB_QUEUE,{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)}).catch(()=>null);return dbPromise}
-async function idbGet(store,key){const db=await openDB();if(!db)return null;return new Promise(res=>{const t=db.transaction(store,'readonly');const r=t.objectStore(store).get(key);r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)})}
+async function idbGet(store,key){const db=await openDB();if(!db)return null;return new Promise(res=>{const t=db.transaction(store,'readonly');const os=t.objectStore(store);const r=os.get(key);r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)})}
+async function idbGetAll(store){const db=await openDB();if(!db)return [];return new Promise(res=>{const t=db.transaction(store,'readonly');const r=t.objectStore(store).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>res([])})}
 async function idbPut(store,value,key){const db=await openDB();if(!db)return;await new Promise(res=>{const t=db.transaction(store,'readwrite');t.objectStore(store).put(value,key);t.oncomplete=res;t.onerror=res})}
 async function idbReplaceQueue(q){const db=await openDB();if(!db)return;await new Promise(res=>{const t=db.transaction(DB_QUEUE,'readwrite');const os=t.objectStore(DB_QUEUE);os.clear();q.forEach(op=>os.put(op));t.oncomplete=res;t.onerror=res})}
-async function hydrateFromIDB(){const saved=await idbGet(DB_STATE,'snapshot');const queued=await idbGet(DB_QUEUE,'all');if(saved&&Array.isArray(saved.batches)){state.batches=saved.batches;state.settings={...state.settings,...(saved.settings||{})}}if(Array.isArray(queued))state.queue=queued;state.dbReady=true;persist();$('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;render();ticks()}
+async function hydrateFromIDB(){const saved=await idbGet(DB_STATE,'snapshot');const queued=await idbGetAll(DB_QUEUE);if(saved&&Array.isArray(saved.batches)){state.batches=saved.batches;state.settings={...state.settings,...(saved.settings||{})}}if(Array.isArray(queued))state.queue=queued;state.dbReady=true;persist();$('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;render();ticks()}
 function persistLocal(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({batches:state.batches,settings:state.settings}));localStorage.setItem('kb_sync_queue',JSON.stringify(state.queue));if(state.lastSyncAt)localStorage.setItem('kb_last_sync_at',state.lastSyncAt)}catch(_){}}
 function persist(){persistLocal();if(state.dbReady){idbPut(DB_STATE,{batches:state.batches,settings:state.settings},'snapshot');idbReplaceQueue(state.queue)}}
 function loadLocal(){try{const raw=localStorage.getItem(STORAGE_KEY)||localStorage.getItem('kb_local_state_v6');if(!raw)return false;const saved=JSON.parse(raw);state.batches=Array.isArray(saved.batches)?saved.batches:[];state.settings={...state.settings,...(saved.settings||{})};return true}catch(_){return false}}
@@ -115,7 +116,39 @@ function removeLocal(id) {
 function queueOp(action,payload){const op={id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,action,payload,attempts:0,nextAttemptAt:0,createdAt:Date.now()};state.queue.push(op);persist();updateSyncBanner();syncQueue({silent:true})}
 function backoffMs(a){return Math.min(120000,Math.max(1500,2000*Math.pow(2,Math.min(a,6))))}
 function updateSyncBanner(){if(!navigator.onLine)return setSyncStatus(`Hors connexion · ${state.queue.length} modification${state.queue.length>1?'s':''} en attente`,'warn');if(state.syncing)return setSyncStatus('Synchronisation en cours…','info');if(state.queue.length)return setSyncStatus(`${state.queue.length} modification${state.queue.length>1?'s':''} en attente`,'warn');if(state.lastSyncAt){const d=new Date(state.lastSyncAt);return setSyncStatus(`Synchronisé à ${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`,'ok')}setSyncStatus('Prêt','ok')}
-async function syncQueue({silent=true}={}){if(state.syncing||!state.queue.length||!navigator.onLine||document.visibilityState==='hidden')return;state.syncing=true;updateSyncBanner();try{while(state.queue.length&&navigator.onLine){const op=state.queue[0];if(op.nextAttemptAt&&Date.now()<op.nextAttemptAt)break;try{const data=await api(op.action,op.payload);if(op.action==='saveSettings'&&data)state.settings={...state.settings,...data};state.queue.shift();persist()}catch(err){op.attempts=(op.attempts||0)+1;op.nextAttemptAt=Date.now()+backoffMs(op.attempts);persist();break}}if(!state.queue.length){await refreshFromServer({silent:true});state.lastSyncAt=new Date().toISOString();persist()}}finally{state.syncing=false;updateSyncBanner()}}
+async function syncQueue({silent=true}={}) {
+  if(state.syncing || !state.queue.length || !navigator.onLine) return;
+  state.syncing=true; updateSyncBanner();
+  try {
+    while(state.queue.length && navigator.onLine) {
+      const now=Date.now();
+      const ready=state.queue.slice(0,5).filter(op=>!op.nextAttemptAt || op.nextAttemptAt<=now);
+      if(!ready.length) break;
+      try {
+        const result=await api('syncBatch',{ops:ready});
+        const processed=Number(result?.processed||0);
+        if(processed>0){
+          state.queue.splice(0,processed);
+          persist();
+          continue;
+        }
+        throw new Error(result?.error||'Aucune opération synchronisée.');
+      } catch(err) {
+        const op=state.queue[0];
+        op.attempts=(op.attempts||0)+1;
+        op.nextAttemptAt=Date.now()+backoffMs(op.attempts);
+        op.lastError=String(err.message||err);
+        persist();
+        if(!silent) toast('Synchronisation différée : '+op.lastError,'warn');
+        break;
+      }
+    }
+    if(!state.queue.length) {
+      await refreshFromServer({silent:true});
+      state.lastSyncAt=new Date().toISOString(); persist();
+    }
+  } finally { state.syncing=false; updateSyncBanner(); }
+}
 async function refreshFromServer({silent=true}={}){if(!navigator.onLine||state.queue.length||state.syncing)return false;try{const d=await api('list');state.batches=d.batches||[];state.settings=d.settings||state.settings;state.lastSyncAt=new Date().toISOString();persist();$('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;render();ticks();updateSyncBanner();return true}catch(_){updateSyncBanner();return false}}
 
 function card(b, done) {
@@ -141,8 +174,7 @@ function card(b, done) {
     <div class="batch-main">
       <div class="phase-pill ${phaseClass}">${esc(b.phase)}</div>
       <div class="batch-copy">
-        <p class="card-name">${b.name ? esc(b.name) : 'Batch sans nom'}</p>
-        <div class="card-date"><strong>${date}</strong></div>
+        <p class="card-name"><strong>${date}</strong></p>
         <div class="card-meta">${tags || '<span class="muted-text">Aucun détail</span>'}</div>
       </div>
       <div class="timer-ring ${done ? 'timer-done' : ''}" style="--pct:${pct}%" data-end="${esc(d.end)}">
@@ -192,7 +224,8 @@ function initWheels(){
   document.querySelectorAll('.wheel-picker').forEach(w=>{
     if(w.dataset.ready)return; w.dataset.ready='1';
     const min=Number(w.dataset.min||-14), max=Number(w.dataset.max||30), target=w.dataset.target;
-    for(let v=min;v<=max;v++){ const item=document.createElement('button'); item.type='button'; item.className='wheel-item'; item.dataset.value=v; item.textContent=v===0?'0':(v>0?`+${v}`:`${v}`); w.appendChild(item); }
+    const values=[0,...Array.from({length:max},(_,i)=>i+1),...Array.from({length:Math.abs(min)},(_,i)=>-(i+1))];
+    for(const v of values){ const item=document.createElement('button'); item.type='button'; item.className='wheel-item'; item.dataset.value=v; item.textContent=v===0?'0':(v>0?`+${v}`:`${v}`); w.appendChild(item); }
     w.addEventListener('scroll',()=>{ const center=w.scrollTop+w.clientHeight/2; let best=null,dist=Infinity; w.querySelectorAll('.wheel-item').forEach(el=>{const d=Math.abs(el.offsetTop+el.offsetHeight/2-center);if(d<dist){dist=d;best=el;}}); if(best)selectWheel(w,Number(best.dataset.value),false); });
     w.addEventListener('click',e=>{const item=e.target.closest('.wheel-item');if(!item)return;selectWheel(w,Number(item.dataset.value),true);});
     requestAnimationFrame(()=>selectWheel(w,0,false));
@@ -204,9 +237,8 @@ function resetWheel(targetId){ const w=document.querySelector(`.wheel-picker[dat
 function openAdd() {
   $('batchForm').reset();
   $('batchId').value = crypto.randomUUID ? crypto.randomUUID() : `tmp-${Date.now()}`;
-  $('batchName').value = '';
+  $('batchName').value = new Date().toLocaleDateString('fr-FR');
   $('batchF1Days').value = state.settings.defaultF1;
-  $('batchF1Days').classList.add('default-value');
   $('batchExtendDays').value = 0;
   resetWheel('batchExtendDays');
   $('batchModalTitle').textContent = 'Nouveau batch';
@@ -218,7 +250,7 @@ function openF2(id) {
   const b = state.batches.find(x=>x.id===id); if(!b) return;
   $('f2Form').reset();
   $('f2BatchId').value = id;
-  $('f2Days').value = state.settings.defaultF2; $('f2Days').classList.add('default-value');
+  $('f2Days').value = state.settings.defaultF2;
   $('f2Flavor').value = '';
   $('f2Notes').value = '';
   $('f2ExtendDays').value = 0;
@@ -265,8 +297,7 @@ function optimisticUpdate(b, payload) {
   return next;
 }
 
-$('batchF1Days').addEventListener('input',()=> $('batchF1Days').classList.remove('default-value'));
-$('f2Days').addEventListener('input',()=> $('f2Days').classList.remove('default-value'));
+
 initWheels();
 $('addBtn').addEventListener('click', openAdd);
 $('refreshBtn').addEventListener('click', async ()=>{ await syncQueue({silent:false}); await refreshFromServer({silent:false}); });
@@ -296,7 +327,7 @@ document.addEventListener('click', async e=>{
 
 $('batchForm').addEventListener('submit', async e=>{
   e.preventDefault(); const btn=e.submitter; btn.disabled=true;
-  const payload={id:$('batchId').value,name:$('batchName').value.trim(),f1Days:Number($('batchF1Days').value),liters:Number($('batchLiters').value||0),teaGrams:Number($('batchTeaGrams').value||0),sugarGrams:Number($('batchSugarGrams').value||0),f1Notes:$('batchNotes').value.trim()};
+  const payload={id:$('batchId').value,name:new Date().toLocaleDateString('fr-FR'),f1Days:Number($('batchF1Days').value),liters:Number($('batchLiters').value||0),teaGrams:Number($('batchTeaGrams').value||0),sugarGrams:Number($('batchSugarGrams').value||0),f1Notes:$('batchNotes').value.trim()};
   try { const b=buildOptimisticF1(payload); upsertLocal(b); queueOp('createF1',payload); hide('batchModal'); toast('Batch créé. Il sera synchronisé en arrière-plan.'); }
   catch(err){toast(err.message,'warn')} finally {btn.disabled=false;}
 });

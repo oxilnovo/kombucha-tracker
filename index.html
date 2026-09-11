@@ -7,7 +7,7 @@
   <meta name="description" content="Kombucha Tracker — suivi partagé des fermentations">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=8">
+  <link rel="stylesheet" href="styles.css?v=9">
   <title>Kombucha Tracker</title>
 </head>
 <body>
@@ -46,16 +46,11 @@
   </main>
 
   <nav class="bottom-nav" aria-label="Navigation">
-    <div class="nav-side">
-      <button class="nav-btn active" data-page="active"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><small>Mes batchs</small></button>
-    </div>
-    <div class="nav-fab-slot" aria-hidden="true"></div>
-    <div class="nav-side">
-      <button class="nav-btn" data-page="completed"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg></span><small>Terminés</small></button>
-    </div>
-    <button class="nav-btn settings-nav" data-page="settings"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z"/><path d="m19 13.2 1.4 1.1-1.7 3-1.7-.6a7.9 7.9 0 0 1-1.8 1l-.3 1.8h-3.5l-.3-1.8a7.9 7.9 0 0 1-1.8-1l-1.7.6-1.7-3L6 13.2a7.7 7.7 0 0 1 0-2.4L4.6 9.7l1.7-3 1.7.6a7.9 7.9 0 0 1 1.8-1l.3-1.8h3.5l.3 1.8a7.9 7.9 0 0 1 1.8 1l1.7-.6 1.7 3L19 10.8a7.7 7.7 0 0 1 0 2.4Z"/></svg></span><small>Settings</small></button>
+    <button class="nav-btn active" data-page="active"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><small>Mes batchs</small></button>
+    <button class="nav-btn" data-page="completed"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg></span><small>Terminés</small></button>
+    <button class="nav-btn" data-page="settings"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z"/><path d="m19 13.2 1.4 1.1-1.7 3-1.7-.6a7.9 7.9 0 0 1-1.8 1l-.3 1.8h-3.5l-.3-1.8a7.9 7.9 0 0 1-1.8-1l-1.7.6-1.7-3L6 13.2a7.7 7.7 0 0 1 0-2.4L4.6 9.7l1.7-3 1.7.6a7.9 7.9 0 0 1 1.8-1l.3-1.8h3.5l.3 1.8a7.9 7.9 0 0 1 1.8 1l1.7-.6 1.7 3L19 10.8a7.7 7.7 0 0 1 0 2.4Z"/></svg></span><small>Settings</small></button>
   </nav>
-  <button id="addBtn" class="fab-add" type="button" aria-label="Ajouter un batch"><span>+</span><small>1</small></button>
+  <button id="addBtn" class="fab-add" type="button" aria-label="Ajouter un batch"><span>+</span></button>
 
   <template id="emptyTemplate"><div class="empty-state"><div class="empty-icon">🫙</div><strong>Aucun batch en cours</strong><span>Utilisez le bouton +1 pour démarrer une fermentation.</span></div></template>
 
@@ -64,7 +59,7 @@
       <div class="modal-header"><div><div class="eyebrow">NOUVEAU BATCH</div><h2 id="batchModalTitle">Créer une F1</h2></div><button class="icon-btn" data-close-modal type="button" aria-label="Fermer">×</button></div>
       <form id="batchForm" class="form-grid">
         <input id="batchId" type="hidden">
-        <label><span>Nom</span><input id="batchName" required maxlength="80" placeholder="Ex. Gingembre citron"></label>
+        <input id="batchName" type="hidden">
         <label><span>Durée F1</span><div class="input-unit"><input id="batchF1Days" type="number" min="1" max="365" step="1" required><b>jours</b></div></label>
         <label><span>Litres</span><div class="input-unit"><input id="batchLiters" type="number" min="0.1" max="500" step="0.1" placeholder="2"><b>L</b></div></label>
         <label><span>Thé</span><div class="input-unit"><input id="batchTeaGrams" type="number" min="0" max="10000" step="1" placeholder="20"><b>g</b></div></label>
