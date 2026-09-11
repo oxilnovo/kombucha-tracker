@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#70503e">
+  <meta name="theme-color" content="#2b2d42">
   <meta name="description" content="Kombucha Tracker — suivi partagé des fermentations">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=7">
+  <link rel="stylesheet" href="styles.css?v=8">
   <title>Kombucha Tracker</title>
 </head>
 <body>
@@ -47,13 +47,13 @@
 
   <nav class="bottom-nav" aria-label="Navigation">
     <div class="nav-side">
-      <button class="nav-btn active" data-page="active"><span class="nav-icon">⌂</span><small>Mes batchs</small></button>
+      <button class="nav-btn active" data-page="active"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><small>Mes batchs</small></button>
     </div>
     <div class="nav-fab-slot" aria-hidden="true"></div>
     <div class="nav-side">
-      <button class="nav-btn" data-page="completed"><span class="nav-icon">▣</span><small>Terminés</small></button>
+      <button class="nav-btn" data-page="completed"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg></span><small>Terminés</small></button>
     </div>
-    <button class="nav-btn settings-nav" data-page="settings"><span class="nav-icon">⚙</span><small>Settings</small></button>
+    <button class="nav-btn settings-nav" data-page="settings"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z"/><path d="m19 13.2 1.4 1.1-1.7 3-1.7-.6a7.9 7.9 0 0 1-1.8 1l-.3 1.8h-3.5l-.3-1.8a7.9 7.9 0 0 1-1.8-1l-1.7.6-1.7-3L6 13.2a7.7 7.7 0 0 1 0-2.4L4.6 9.7l1.7-3 1.7.6a7.9 7.9 0 0 1 1.8-1l.3-1.8h3.5l.3 1.8a7.9 7.9 0 0 1 1.8 1l1.7-.6 1.7 3L19 10.8a7.7 7.7 0 0 1 0 2.4Z"/></svg></span><small>Settings</small></button>
   </nav>
   <button id="addBtn" class="fab-add" type="button" aria-label="Ajouter un batch"><span>+</span><small>1</small></button>
 
@@ -64,13 +64,13 @@
       <div class="modal-header"><div><div class="eyebrow">NOUVEAU BATCH</div><h2 id="batchModalTitle">Créer une F1</h2></div><button class="icon-btn" data-close-modal type="button" aria-label="Fermer">×</button></div>
       <form id="batchForm" class="form-grid">
         <input id="batchId" type="hidden">
-        <label><span>Nom</span><input id="batchName" required maxlength="80"></label>
+        <label><span>Nom</span><input id="batchName" required maxlength="80" placeholder="Ex. Gingembre citron"></label>
         <label><span>Durée F1</span><div class="input-unit"><input id="batchF1Days" type="number" min="1" max="365" step="1" required><b>jours</b></div></label>
         <label><span>Litres</span><div class="input-unit"><input id="batchLiters" type="number" min="0.1" max="500" step="0.1" placeholder="2"><b>L</b></div></label>
         <label><span>Thé</span><div class="input-unit"><input id="batchTeaGrams" type="number" min="0" max="10000" step="1" placeholder="20"><b>g</b></div></label>
         <label><span>Sucre</span><div class="input-unit"><input id="batchSugarGrams" type="number" min="0" max="10000" step="1" placeholder="120"><b>g</b></div></label>
         <label class="wide"><span>Notes</span><textarea id="batchNotes" maxlength="500" placeholder="Observations, conditions, recette…"></textarea></label>
-        <input id="batchExtendDays" type="hidden" value="0">
+        <div class="wide extension-panel"><span class="extension-title">Ajuster la durée</span><div class="wheel-picker" data-target="batchExtendDays" data-min="-14" data-max="30" data-value="0"></div><input id="batchExtendDays" type="hidden" value="0"><div class="wheel-value" data-for="batchExtendDays">Aucun changement</div></div>
         <div class="wide actions"><button class="primary-btn full" type="submit" id="batchSubmit">Démarrer la F1</button></div>
       </form>
     </div>
@@ -84,8 +84,7 @@
         <label><span>Durée F2</span><div class="input-unit"><input id="f2Days" type="number" min="1" max="60" step="1" required><b>jours</b></div></label>
         <label><span>Parfum</span><input id="f2Flavor" maxlength="120" placeholder="Ex. gingembre-citron"></label>
         <label class="wide"><span>Notes</span><textarea id="f2Notes" maxlength="500" placeholder="Mise en bouteille, parfum, température…"></textarea></label>
-        <input id="f2ExtendDays" type="hidden" value="0">
-        <div class="wide extension-panel"><span class="extension-title">Prolonger dès maintenant</span><div class="extend-options" data-target="f2ExtendDays"><button type="button" data-add="0" class="extend-btn active">Aucune</button><button type="button" data-add="1" class="extend-btn">+1 jour</button><button type="button" data-add="2" class="extend-btn">+2 jours</button><button type="button" data-add="3" class="extend-btn">+3 jours</button><button type="button" data-add="7" class="extend-btn">+1 semaine</button></div></div>
+        <div class="wide extension-panel"><span class="extension-title">Ajuster la durée</span><div class="wheel-picker" data-target="f2ExtendDays" data-min="-14" data-max="30" data-value="0"></div><input id="f2ExtendDays" type="hidden" value="0"><div class="wheel-value" data-for="f2ExtendDays">Aucun changement</div></div>
         <div class="wide actions"><button class="primary-btn full" type="submit">Démarrer la F2</button></div>
       </form>
     </div>
@@ -100,15 +99,14 @@
         <label><span>Durée</span><div class="input-unit"><input id="editDays" type="number" min="1" max="365" required><b>jours</b></div></label>
         <div id="editMaterialWrap" class="wide material-row"><label><span>Litres</span><div class="input-unit"><input id="editLiters" type="number" min="0.1" max="500" step="0.1"><b>L</b></div></label><label><span>Thé</span><div class="input-unit"><input id="editTeaGrams" type="number" min="0" max="10000" step="1"><b>g</b></div></label><label><span>Sucre</span><div class="input-unit"><input id="editSugarGrams" type="number" min="0" max="10000" step="1"><b>g</b></div></label></div>
         <label id="editFlavorWrap" class="wide"><span>Parfum</span><input id="editFlavor" maxlength="120"></label>
-        <input id="editExtendDays" type="hidden" value="0">
-        <div class="wide extension-panel"><span class="extension-title">Prolonger la fermentation</span><div class="extend-options" data-target="editExtendDays"><button type="button" data-add="0" class="extend-btn active">Aucune</button><button type="button" data-add="1" class="extend-btn">+1 jour</button><button type="button" data-add="2" class="extend-btn">+2 jours</button><button type="button" data-add="3" class="extend-btn">+3 jours</button><button type="button" data-add="7" class="extend-btn">+1 semaine</button></div></div>
+        <div class="wide extension-panel"><span class="extension-title">Ajuster la durée</span><div class="wheel-picker" data-target="editExtendDays" data-min="-14" data-max="30" data-value="0"></div><input id="editExtendDays" type="hidden" value="0"><div class="wheel-value" data-for="editExtendDays">Aucun changement</div></div>
         <label class="wide"><span>Notes</span><textarea id="editNotes" maxlength="500"></textarea></label>
-        <div class="wide actions"><button class="primary-btn full" type="submit">Enregistrer</button></div>
+        <div class="wide actions edit-actions"><button id="editToF2" class="secondary-action full" type="button">Passer en F2</button><button class="primary-btn full" type="submit">Enregistrer</button></div>
       </form>
     </div>
   </div>
 
   <div id="toast" class="toast" aria-live="polite"></div>
-  <script src="config.js"></script><script src="app.js?v=7"></script>
+  <script src="config.js"></script><script src="app.js?v=8"></script>
 </body>
 </html>

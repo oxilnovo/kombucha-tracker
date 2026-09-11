@@ -132,17 +132,17 @@ function card(b, done) {
   ] : [b.flavor ? `<span class="mini-tag">${esc(b.flavor)}</span>` : '']).filter(Boolean).join('');
   const actions = `<div class="card-actions">
     ${!done && b.phase === 'F1' ? `<button class="secondary-action" data-action="f2" data-id="${esc(b.id)}">Passer en F2</button>` : ''}
-    <button class="icon-action edit-action" data-action="edit" data-id="${esc(b.id)}" aria-label="Modifier">✎</button>
-    <button class="icon-action delete-action" data-action="delete" data-id="${esc(b.id)}" aria-label="Supprimer">🗑</button>
+    <button class="icon-action edit-action" data-action="edit" data-id="${esc(b.id)}" aria-label="Modifier"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 17.5-.8 3.3 3.3-.8L18.8 7.7a2.1 2.1 0 0 0 0-3l-.5-.5a2.1 2.1 0 0 0-3 0L4 17.5Z"/><path d="m13.8 5.8 4.4 4.4"/></svg></button>
+    <button class="icon-action delete-action" data-action="delete" data-id="${esc(b.id)}" aria-label="Supprimer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg></button>
   </div>`;
   const ratingHtml = done ? `<div class="rating-row"><span class="countdown-text">Votre note</span><div class="rating-buttons">${faces.map((f,i)=>`<button class="rating-btn ${rating===i+1?'selected':''}" data-action="rate" data-rating="${i+1}" data-id="${esc(b.id)}">${f}</button>`).join('')}</div></div>` : '';
-  const date = d.start ? new Date(d.start).toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'}) : '—';
+  const date = d.start ? new Date(d.start).toLocaleDateString('fr-FR', {day:'2-digit', month:'long', year:'numeric'}) : '—';
   return `<article class="batch-card ${done ? 'is-done' : ''}">
     <div class="batch-main">
       <div class="phase-pill ${phaseClass}">${esc(b.phase)}</div>
       <div class="batch-copy">
-        <p class="card-name">${esc(b.name || 'Batch')}</p>
-        <div class="card-date">Démarré le ${date}</div>
+        <p class="card-name">${b.name ? esc(b.name) : 'Batch sans nom'}</p>
+        <div class="card-date"><strong>${date}</strong></div>
         <div class="card-meta">${tags || '<span class="muted-text">Aucun détail</span>'}</div>
       </div>
       <div class="timer-ring ${done ? 'timer-done' : ''}" style="--pct:${pct}%" data-end="${esc(d.end)}">
@@ -187,25 +187,28 @@ function show(id){const el=$(id);el.classList.remove('hidden');el.setAttribute('
 function hide(id){const el=$(id);el.classList.add('hidden');el.setAttribute('aria-hidden','true');}
 function closeAllModals(){document.querySelectorAll('.modal').forEach(m=>hide(m.id));}
 
-function autoBatchName() {
-  const now = new Date();
-  const stamp = now.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
-  return `Batch ${stamp}`;
+function wheelLabel(v){ const n=Number(v); if(n===0)return 'Aucun changement'; return n>0?`+${n} ${n===1?'jour':'jours'}`:`${n} ${n===-1?'jour':'jours'}`; }
+function initWheels(){
+  document.querySelectorAll('.wheel-picker').forEach(w=>{
+    if(w.dataset.ready)return; w.dataset.ready='1';
+    const min=Number(w.dataset.min||-14), max=Number(w.dataset.max||30), target=w.dataset.target;
+    for(let v=min;v<=max;v++){ const item=document.createElement('button'); item.type='button'; item.className='wheel-item'; item.dataset.value=v; item.textContent=v===0?'0':(v>0?`+${v}`:`${v}`); w.appendChild(item); }
+    w.addEventListener('scroll',()=>{ const center=w.scrollTop+w.clientHeight/2; let best=null,dist=Infinity; w.querySelectorAll('.wheel-item').forEach(el=>{const d=Math.abs(el.offsetTop+el.offsetHeight/2-center);if(d<dist){dist=d;best=el;}}); if(best)selectWheel(w,Number(best.dataset.value),false); });
+    w.addEventListener('click',e=>{const item=e.target.closest('.wheel-item');if(!item)return;selectWheel(w,Number(item.dataset.value),true);});
+    requestAnimationFrame(()=>selectWheel(w,0,false));
+  });
 }
-
-function extensionPicker(targetId) {
-  return `<div class="extend-picker"><span>Prolonger de</span><div class="extend-options" data-target="${targetId}">
-    <button type="button" data-add="0" class="extend-btn active">0</button><button type="button" data-add="1" class="extend-btn">+1</button><button type="button" data-add="2" class="extend-btn">+2</button><button type="button" data-add="3" class="extend-btn">+3</button><button type="button" data-add="7" class="extend-btn">+7</button>
-  </div><input id="${targetId}" type="hidden" value="0"></div>`;
-}
+function selectWheel(w,value,scroll){ const item=w.querySelector(`[data-value="${value}"]`); if(!item)return; w.querySelectorAll('.wheel-item').forEach(x=>x.classList.toggle('selected',x===item)); const target=w.dataset.target, input=$(target); if(input)input.value=value; const out=document.querySelector(`.wheel-value[data-for="${target}"]`); if(out)out.textContent=wheelLabel(value); if(scroll)w.scrollTo({top:item.offsetTop-(w.clientHeight-item.offsetHeight)/2,behavior:'smooth'}); }
+function resetWheel(targetId){ const w=document.querySelector(`.wheel-picker[data-target="${targetId}"]`); if(w)selectWheel(w,0,true); }
 
 function openAdd() {
   $('batchForm').reset();
   $('batchId').value = crypto.randomUUID ? crypto.randomUUID() : `tmp-${Date.now()}`;
-  $('batchName').value = autoBatchName();
+  $('batchName').value = '';
   $('batchF1Days').value = state.settings.defaultF1;
+  $('batchF1Days').classList.add('default-value');
   $('batchExtendDays').value = 0;
-  document.querySelectorAll('#batchForm .extend-btn').forEach(b=>b.classList.toggle('active', b.dataset.add==='0'));
+  resetWheel('batchExtendDays');
   $('batchModalTitle').textContent = 'Nouveau batch';
   show('batchModal');
   setTimeout(()=>$('batchName').focus(),50);
@@ -215,11 +218,11 @@ function openF2(id) {
   const b = state.batches.find(x=>x.id===id); if(!b) return;
   $('f2Form').reset();
   $('f2BatchId').value = id;
-  $('f2Days').value = state.settings.defaultF2;
+  $('f2Days').value = state.settings.defaultF2; $('f2Days').classList.add('default-value');
   $('f2Flavor').value = '';
   $('f2Notes').value = '';
   $('f2ExtendDays').value = 0;
-  document.querySelectorAll('#f2Form .extend-btn').forEach(x=>x.classList.toggle('active', x.dataset.add==='0'));
+  resetWheel('f2ExtendDays');
   $('f2ModalTitle').textContent = `F2 · ${b.name}`;
   show('f2Modal');
 }
@@ -230,8 +233,8 @@ function openEdit(id) {
   $('editId').value=b.id; $('editPhase').value=b.phase; $('editName').value=b.name||''; $('editDays').value=d.days||1;
   $('editLiters').value=b.liters??''; $('editTeaGrams').value=b.teaGrams??''; $('editSugarGrams').value=b.sugarGrams??'';
   $('editFlavor').value=b.flavor||''; $('editNotes').value=b.phase==='F2'?(b.f2Notes||''):(b.f1Notes||''); $('editExtendDays').value=0;
-  $('editFlavorWrap').style.display=b.phase==='F2'?'grid':'none'; $('editMaterialWrap').style.display=b.phase==='F2'?'none':'grid';
-  document.querySelectorAll('#editForm .extend-btn').forEach(x=>x.classList.toggle('active', x.dataset.add==='0'));
+  $('editFlavorWrap').style.display=b.phase==='F2'?'grid':'none'; $('editMaterialWrap').style.display=b.phase==='F2'?'none':'grid'; $('editToF2').style.display=b.phase==='F2'?'none':'block';
+  resetWheel('editExtendDays');
   $('editModalTitle').textContent=`Modifier · ${b.name} · ${b.phase}`; show('editModal');
 }
 
@@ -258,10 +261,13 @@ function optimisticUpdate(b, payload) {
   const add = Number(payload.extendDays||0);
   const end = new Date(start + (baseDays + add)*86400000).toISOString();
   if (phase==='F1') Object.assign(next,{f1Days:baseDays+add,f1EndAt:end,f1Notes:payload.notes||'',f1Liters:payload.liters||'',f1TeaGrams:payload.teaGrams||'',f1SugarGrams:payload.sugarGrams||'',liters:payload.liters||'',teaGrams:payload.teaGrams||'',sugarGrams:payload.sugarGrams||''});
-  else Object.assign(next,{f2Days:baseDays+add,f2EndAt:end,f2Notes:payload.notes||'',liters:payload.liters||'',teaGrams:payload.teaGrams||'',sugarGrams:payload.sugarGrams||'',flavor:payload.flavor||''});
+  else Object.assign(next,{f2Days:baseDays+add,f2EndAt:end,f2Notes:payload.notes||'',flavor:payload.flavor||''});
   return next;
 }
 
+$('batchF1Days').addEventListener('input',()=> $('batchF1Days').classList.remove('default-value'));
+$('f2Days').addEventListener('input',()=> $('f2Days').classList.remove('default-value'));
+initWheels();
 $('addBtn').addEventListener('click', openAdd);
 $('refreshBtn').addEventListener('click', async ()=>{ await syncQueue({silent:false}); await refreshFromServer({silent:false}); });
 document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>page(b.dataset.page)));
@@ -269,14 +275,6 @@ document.querySelectorAll('[data-close-modal]').forEach(b=>b.addEventListener('c
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)hide(m.id)}));
 
 document.addEventListener('click', async e=>{
-  const ext = e.target.closest('.extend-btn');
-  if (ext) {
-    const wrap = ext.closest('.extend-options');
-    wrap.querySelectorAll('.extend-btn').forEach(b=>b.classList.remove('active'));
-    ext.classList.add('active');
-    $(wrap.dataset.target).value = ext.dataset.add;
-    return;
-  }
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const a = el.dataset.action, id=el.dataset.id;
@@ -310,6 +308,8 @@ $('f2Form').addEventListener('submit', async e=>{
   try { upsertLocal(optimisticStartF2(b,payload)); queueOp('startF2',payload); hide('f2Modal'); toast('F2 démarrée. Synchronisation en arrière-plan.'); }
   catch(err){toast(err.message,'warn')} finally{btn.disabled=false;}
 });
+
+$('editToF2').addEventListener('click',()=>{ const id=$('editId').value, b=state.batches.find(x=>x.id===id); if(!b || b.phase==='F2') return; hide('editModal'); openF2(id); });
 
 $('editForm').addEventListener('submit', async e=>{
   e.preventDefault(); const btn=e.submitter; btn.disabled=true;
