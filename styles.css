@@ -46,3 +46,50 @@ body{background:var(--soft-linen);color:var(--text)}
 .extend-btn.active{background:var(--ash-grey)!important;border-color:var(--ash-grey)!important}
 .complete-action{background:var(--vibrant-coral)!important}
 .badge-f2{background:var(--lemon-chiffon)!important;color:var(--taupe-grey)!important}
+
+
+/* v13 - palette, duration steppers, right floating add, richer countdown */
+:root{--vibrant-coral:#FFD216;--lemon-chiffon:#FFD216;--ash-grey:#519C7C;--taupe-grey:#B3684A;--soft-linen:#f7f3ec;--text:#5d576b;--muted:#8b8179;--line:#ded8d0}
+body{background:var(--soft-linen);color:var(--taupe-grey)}
+.hero{background:var(--taupe-grey)!important}
+.primary-btn{background:var(--ash-grey)!important;color:#fff!important}
+.phase-pill.f1{background:var(--vibrant-coral)!important;color:#5d4b00!important}
+.phase-pill.f2{background:var(--ash-grey)!important;color:#fff!important}
+.timer-ring{background:conic-gradient(var(--ash-grey) var(--pct),#dedbd6 0)!important;box-shadow:inset 0 0 0 4px rgba(93,87,107,.10)}
+.timer-ring::after{inset:9px!important}
+.timer-content{min-width:58px}
+.timer-days{font-size:24px!important;font-weight:900!important;color:var(--taupe-grey)!important;line-height:1}
+.timer-days-unit{font-size:12px;font-weight:800;margin-left:2px}
+.timer-hours{font-size:12px;font-weight:700;color:#8a7d75;margin-top:5px}
+.timer-small{display:none!important}
+
+.stepper{display:flex;align-items:center;width:100%;min-height:52px;background:#fff;border:1px solid #ddd7cf;border-radius:18px;overflow:hidden;box-shadow:0 3px 10px rgba(93,87,107,.05)}
+.stepper-btn{-webkit-tap-highlight-color:transparent;appearance:none;border:0;background:var(--vibrant-coral);color:#5d4b00;width:58px;align-self:stretch;font-size:30px;font-weight:500;line-height:1;touch-action:manipulation}
+.stepper-btn:active,.stepper-btn:focus{background:var(--vibrant-coral);color:#5d4b00;outline:none;box-shadow:none}
+.stepper-value{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:0 6px}
+.stepper-value input{width:64px!important;text-align:center!important;border:0!important;background:transparent!important;padding:10px 0!important;font-size:21px!important;font-weight:800!important;color:var(--taupe-grey)!important;outline:none!important}
+.stepper-value span{font-size:12px;font-weight:800;color:#8b8179}
+
+/* Floating add: intentionally off-center, overlapping the right side of the nav */
+.fab-add{left:auto!important;right:24px!important;transform:none!important;bottom:76px!important;width:66px!important;height:66px!important;border-radius:50%!important;background:var(--vibrant-coral)!important;color:#5d4b00!important;border:5px solid var(--soft-linen)!important;box-shadow:0 10px 26px rgba(93,87,107,.20)!important;z-index:46}
+.fab-add span{font-size:38px!important;font-weight:500!important}
+.bottom-nav{z-index:40!important}
+.nav-btn,.nav-btn *,.fab-add,.stepper-btn,.icon-action,.secondary-action,.primary-btn{-webkit-tap-highlight-color:transparent}
+.nav-btn:focus,.nav-btn:active,.nav-btn:hover{outline:none;background:transparent!important}
+.nav-btn.active .nav-icon{background:rgba(255,210,22,.32)!important}
+@media(max-width:640px){.fab-add{right:18px!important;bottom:74px!important;width:62px!important;height:62px!important}.stepper-btn{width:56px}.timer-ring{width:78px!important;height:78px!important}.timer-days{font-size:22px!important}}
+
+
+/* v13 final: duration control styled like a compact +/- pill */
+.stepper{background:var(--vibrant-coral)!important;border:0!important;border-radius:28px!important;min-height:64px!important;box-shadow:0 5px 14px rgba(93,87,107,.10)!important;padding:5px!important;overflow:visible!important}
+.stepper-btn{background:transparent!important;color:#4e4730!important;border-radius:22px!important;width:60px!important;font-size:30px!important}
+.stepper-value{background:#fff!important;border-radius:50%!important;width:58px!important;height:54px!important;flex:0 0 58px!important;padding:0!important;box-shadow:0 1px 4px rgba(93,87,107,.08)!important}
+.stepper-value input{width:38px!important;font-size:22px!important}
+.stepper-value span{display:none!important}
+.stepper:focus-within{box-shadow:0 5px 14px rgba(93,87,107,.10)!important}
+.stepper-btn:focus-visible{outline:2px solid rgba(93,87,107,.25)!important;outline-offset:-3px}
+button{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+button:focus,button:active{outline:none}
+.fab-add{background:var(--vibrant-coral)!important;color:#4e4730!important}
+.timer-ring{border:4px solid var(--ash-grey)!important;background:conic-gradient(var(--ash-grey) var(--pct),#dedbd6 0)!important}
+@media(max-width:640px){.stepper{min-height:62px!important}.stepper-btn{width:56px!important}.stepper-value{flex-basis:54px!important;width:54px!important;height:52px!important}.stepper-value input{font-size:21px!important}}

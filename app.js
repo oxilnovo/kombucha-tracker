@@ -1,6 +1,6 @@
 const state = {
   batches: [],
-  settings: { defaultF1: 7, defaultF2: 2 },
+  settings: { defaultF1: 7, defaultF2: 2, defaultLiters: 2 },
   queue: JSON.parse(localStorage.getItem('kb_sync_queue') || '[]'),
   deferredPrompt: null,
   syncing: false,
@@ -52,7 +52,7 @@ async function idbGet(store,key){const db=await openDB();if(!db)return null;retu
 async function idbGetAll(store){const db=await openDB();if(!db)return [];return new Promise(res=>{const t=db.transaction(store,'readonly');const r=t.objectStore(store).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>res([])})}
 async function idbPut(store,value,key){const db=await openDB();if(!db)return;await new Promise(res=>{const t=db.transaction(store,'readwrite');t.objectStore(store).put(value,key);t.oncomplete=res;t.onerror=res})}
 async function idbReplaceQueue(q){const db=await openDB();if(!db)return;await new Promise(res=>{const t=db.transaction(DB_QUEUE,'readwrite');const os=t.objectStore(DB_QUEUE);os.clear();q.forEach(op=>os.put(op));t.oncomplete=res;t.onerror=res})}
-async function hydrateFromIDB(){const saved=await idbGet(DB_STATE,'snapshot');const queued=await idbGetAll(DB_QUEUE);if(saved&&Array.isArray(saved.batches)){state.batches=saved.batches;state.settings={...state.settings,...(saved.settings||{})}}if(Array.isArray(queued))state.queue=queued;state.dbReady=true;persist();$('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;render();ticks()}
+async function hydrateFromIDB(){const saved=await idbGet(DB_STATE,'snapshot');const queued=await idbGetAll(DB_QUEUE);if(saved&&Array.isArray(saved.batches)){state.batches=saved.batches;state.settings={...state.settings,...(saved.settings||{})}}if(Array.isArray(queued))state.queue=queued;state.dbReady=true;persist();$('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;$('defaultLiters').value=state.settings.defaultLiters;render();ticks()}
 function persistLocal(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({batches:state.batches,settings:state.settings}));localStorage.setItem('kb_sync_queue',JSON.stringify(state.queue));if(state.lastSyncAt)localStorage.setItem('kb_last_sync_at',state.lastSyncAt)}catch(_){}}
 function persist(){persistLocal();if(state.dbReady){idbPut(DB_STATE,{batches:state.batches,settings:state.settings},'snapshot');idbReplaceQueue(state.queue)}}
 function loadLocal(){try{const raw=localStorage.getItem(STORAGE_KEY)||localStorage.getItem('kb_local_state_v6');if(!raw)return false;const saved=JSON.parse(raw);state.batches=Array.isArray(saved.batches)?saved.batches:[];state.settings={...state.settings,...(saved.settings||{})};return true}catch(_){return false}}
@@ -149,7 +149,7 @@ async function syncQueue({silent=true}={}) {
     }
   } finally { state.syncing=false; updateSyncBanner(); }
 }
-async function refreshFromServer({silent=true}={}){if(!navigator.onLine||state.queue.length||state.syncing)return false;try{const d=await api('list');state.batches=d.batches||[];state.settings=d.settings||state.settings;state.lastSyncAt=new Date().toISOString();persist();$('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;render();ticks();updateSyncBanner();return true}catch(_){updateSyncBanner();return false}}
+async function refreshFromServer({silent=true}={}){if(!navigator.onLine||state.queue.length||state.syncing)return false;try{const d=await api('list');state.batches=d.batches||[];state.settings=d.settings||state.settings;state.lastSyncAt=new Date().toISOString();persist();$('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;$('defaultLiters').value=state.settings.defaultLiters;render();ticks();updateSyncBanner();return true}catch(_){updateSyncBanner();return false}}
 
 function card(b, done) {
   const d = dataFor(b);
@@ -178,7 +178,7 @@ function card(b, done) {
         <div class="card-meta">${tags || '<span class="muted-text">Aucun détail</span>'}</div>
       </div>
       <div class="timer-ring ${done ? 'timer-done' : ''}" style="--pct:${pct}%" data-end="${esc(d.end)}">
-        <div class="timer-content"><div class="timer-days">${done ? '✓' : daysLeft}</div><div class="timer-small">${done ? 'terminé' : 'jours'}</div></div>
+        <div class="timer-content"><div class="timer-days">${done ? '✓' : daysLeft}<span class="timer-days-unit">${done ? '' : 'j'}</span></div><div class="timer-hours">${done ? 'terminé' : String(Math.floor((left % 86400000) / 3600000)).padStart(2,'0') + ' h'}</div></div>
       </div>
     </div>
     <div class="card-subrow"><span class="countdown-text">${done ? 'Fermentation terminée' : `Encore ${duration(left)}`}</span>${actions}</div>
@@ -201,9 +201,9 @@ function ticks() {
     const done = diff <= 0;
     e.classList.toggle('timer-done', done);
     const d = e.querySelector('.timer-days');
-    const s = e.querySelector('.timer-small');
-    if (done) { if (d) d.textContent = '✓'; if (s) s.textContent = 'terminé'; }
-    else { if (d) d.textContent = Math.floor(diff / 86400000); if (s) s.textContent = 'jours'; }
+    const s = e.querySelector('.timer-hours');
+    if (done) { if (d) d.innerHTML = '✓'; if (s) s.textContent = 'terminé'; }
+    else { if (d) d.innerHTML = `${Math.floor(diff / 86400000)}<span class="timer-days-unit">j</span>`; if (s) s.textContent = `${String(Math.floor((diff % 86400000) / 3600000)).padStart(2,'0')} h`; }
     const cardEl = e.closest('.batch-card');
     const text = cardEl?.querySelector('.countdown-text');
     if (text && !cardEl.classList.contains('is-done')) text.textContent = diff > 0 ? `Encore ${duration(diff)}` : 'Fermentation terminée';
@@ -224,6 +224,7 @@ function openAdd() {
   $('batchId').value = crypto.randomUUID ? crypto.randomUUID() : `tmp-${Date.now()}`;
   $('batchName').value = new Date().toLocaleDateString('fr-FR');
   $('batchF1Days').value = state.settings.defaultF1;
+  $('batchLiters').value = state.settings.defaultLiters;
   $('batchModalTitle').textContent = 'Nouveau batch';
   show('batchModal');
   setTimeout(()=>$('batchName').focus(),50);
@@ -279,6 +280,8 @@ function optimisticUpdate(b, payload) {
 }
 
 
+document.querySelectorAll('.stepper').forEach(stepper=>stepper.addEventListener('click',e=>{const btn=e.target.closest('.stepper-btn');if(!btn)return;const input=stepper.querySelector('input');const delta=Number(btn.dataset.step||0);const min=Number(input.min||0),max=Number(input.max||999999),step=Number(input.step||1);const next=Math.min(max,Math.max(min,Number(input.value||0)+delta));input.value=Number.isInteger(step)?Math.round(next):next.toFixed(1).replace(/\.0$/,'');input.dispatchEvent(new Event('input',{bubbles:true}));}));
+
 $('addBtn').addEventListener('click', openAdd);
 $('refreshBtn').addEventListener('click', async ()=>{ await syncQueue({silent:false}); await refreshFromServer({silent:false}); });
 document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>page(b.dataset.page)));
@@ -310,7 +313,7 @@ document.addEventListener('click', async e=>{
 
 $('batchForm').addEventListener('submit', async e=>{
   e.preventDefault(); const btn=e.submitter; btn.disabled=true;
-  const payload={id:$('batchId').value,name:new Date().toLocaleDateString('fr-FR'),f1Days:Number($('batchF1Days').value),liters:Number($('batchLiters').value||0),teaGrams:Number($('batchTeaGrams').value||0),sugarGrams:Number($('batchSugarGrams').value||0),f1Notes:$('batchNotes').value.trim()};
+  const payload={id:$('batchId').value,name:new Date().toLocaleDateString('fr-FR'),f1Days:Number($('batchF1Days').value),liters:$('batchLiters').value.trim(),teaGrams:$('batchTeaGrams').value.trim(),sugarGrams:$('batchSugarGrams').value.trim(),f1Notes:$('batchNotes').value.trim()};
   try { const b=buildOptimisticF1(payload); upsertLocal(b); queueOp('createF1',payload); hide('batchModal'); toast('Batch créé. Il sera synchronisé en arrière-plan.'); }
   catch(err){toast(err.message,'warn')} finally {btn.disabled=false;}
 });
@@ -335,9 +338,9 @@ $('editForm').addEventListener('submit', async e=>{
 
 $('settingsForm').addEventListener('submit', async e=>{
   e.preventDefault();
-  const defaultF1=Number($('defaultF1').value), defaultF2=Number($('defaultF2').value);
-  state.settings={defaultF1,defaultF2}; persist();
-  queueOp('saveSettings',{defaultF1,defaultF2}); toast('Paramètres enregistrés localement.');
+  const defaultF1=Number($('defaultF1').value), defaultF2=Number($('defaultF2').value), defaultLiters=Number($('defaultLiters').value);
+  state.settings={defaultF1,defaultF2,defaultLiters}; persist();
+  queueOp('saveSettings',{defaultF1,defaultF2,defaultLiters}); toast('Paramètres enregistrés localement.');
 });
 
 window.addEventListener('online',()=>{ setSyncStatus('Connexion retrouvée · synchronisation…','info'); syncQueue({silent:false}); });
@@ -349,10 +352,10 @@ document.addEventListener('keydown', e=>{if(e.key==='Escape')closeAllModals()});
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.deferredPrompt=e;$('installBtn').classList.remove('hidden')});
 $('installBtn').addEventListener('click',async()=>{if(!state.deferredPrompt)return;state.deferredPrompt.prompt();await state.deferredPrompt.userChoice;state.deferredPrompt=null;$('installBtn').classList.add('hidden')});
 
-if('serviceWorker' in navigator) window.addEventListener('load',async()=>{try{const regs=await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r=>r.update())); await navigator.serviceWorker.register('./sw.js?v=12')}catch(_){}});
+if('serviceWorker' in navigator) window.addEventListener('load',async()=>{try{const regs=await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r=>r.update())); await navigator.serviceWorker.register('./sw.js?v=13')}catch(_){}});
 
 loadLocal();
-$('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;render();ticks();updateSyncBanner();
+$('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;$('defaultLiters').value=state.settings.defaultLiters;render();ticks();updateSyncBanner();
 (async()=>{await hydrateFromIDB();if(navigator.onLine){await syncQueue({silent:true});await refreshFromServer({silent:true})}})();
 setInterval(ticks,60000);
 setInterval(()=>{if(document.visibilityState!=='hidden'){syncQueue({silent:true});if(!state.queue.length)refreshFromServer({silent:true})}},30000);
