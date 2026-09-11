@@ -244,11 +244,10 @@ function openF2(id) {
 function openEdit(id) {
   const b = state.batches.find(x=>x.id===id); if(!b) return;
   const d = dataFor(b);
-  $('editId').value=b.id; $('editPhase').value=b.phase; $('editName').value=b.name||''; $('editDays').value=d.days||1;
+  $('editId').value=b.id; $('editPhase').value=b.phase; $('editName').value=b.name||''; $('editAdjustDays').value=0;
   $('editLiters').value=b.liters??''; $('editTeaGrams').value=b.teaGrams??''; $('editSugarGrams').value=b.sugarGrams??'';
   $('editFlavor').value=b.flavor||''; $('editNotes').value=b.phase==='F2'?(b.f2Notes||''):(b.f1Notes||''); $('editExtendDays').value=0;
   $('editFlavorWrap').style.display=b.phase==='F2'?'grid':'none'; $('editMaterialWrap').style.display=b.phase==='F2'?'none':'grid'; $('editToF2').style.display=b.phase==='F2'?'none':'block';
-  const eg=document.querySelector('.extend-options[data-target="editExtendDays"]'); if(eg)eg.querySelectorAll('.extend-btn').forEach(x=>x.classList.toggle('active',x.dataset.value==='0'));
   $('editModalTitle').textContent=`Modifier · ${b.name} · ${b.phase}`; show('editModal');
 }
 
@@ -274,8 +273,8 @@ function optimisticUpdate(b, payload) {
   const baseDays = Number(payload.days);
   const add = Number(payload.extendDays||0);
   const end = new Date(start + (baseDays + add)*86400000).toISOString();
-  if (phase==='F1') Object.assign(next,{f1Days:baseDays+add,f1EndAt:end,f1Notes:payload.notes||'',f1Liters:payload.liters||'',f1TeaGrams:payload.teaGrams||'',f1SugarGrams:payload.sugarGrams||'',liters:payload.liters||'',teaGrams:payload.teaGrams||'',sugarGrams:payload.sugarGrams||''});
-  else Object.assign(next,{f2Days:baseDays+add,f2EndAt:end,f2Notes:payload.notes||'',flavor:payload.flavor||''});
+  if (phase==='F1') Object.assign(next,{f1Days:finalDays,f1EndAt:end,f1Notes:payload.notes||'',f1Liters:payload.liters||'',f1TeaGrams:payload.teaGrams||'',f1SugarGrams:payload.sugarGrams||'',liters:payload.liters||'',teaGrams:payload.teaGrams||'',sugarGrams:payload.sugarGrams||''});
+  else Object.assign(next,{f2Days:finalDays,f2EndAt:end,f2Notes:payload.notes||'',flavor:payload.flavor||''});
   return next;
 }
 
@@ -288,7 +287,6 @@ document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>
 document.querySelectorAll('[data-close-modal]').forEach(b=>b.addEventListener('click', closeAllModals));
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)hide(m.id)}));
 
-document.querySelectorAll('.extend-options').forEach(group=>group.addEventListener('click',e=>{const b=e.target.closest('.extend-btn');if(!b)return;group.querySelectorAll('.extend-btn').forEach(x=>x.classList.toggle('active',x===b));const id=group.dataset.target;$(id).value=b.dataset.value;const out=document.querySelector(`.wheel-value[data-for="${id}"]`);if(out){const n=Number(b.dataset.value);out.textContent=n===0?'Aucun changement':(n>0?`+${n} ${n===1?'jour':'jours'}`:`${n} ${Math.abs(n)===1?'jour':'jours'}`)}}));
 
 document.addEventListener('click', async e=>{
   const el = e.target.closest('[data-action]');
@@ -331,7 +329,8 @@ $('editToF2').addEventListener('click',()=>{ const id=$('editId').value, b=state
 $('editForm').addEventListener('submit', async e=>{
   e.preventDefault(); const btn=e.submitter; btn.disabled=true;
   const id=$('editId').value,b=state.batches.find(x=>x.id===id); if(!b){btn.disabled=false;return;}
-  const payload={id,phase:$('editPhase').value,name:$('editName').value.trim(),days:Number($('editDays').value),liters:Number($('editLiters').value||0),teaGrams:Number($('editTeaGrams').value||0),sugarGrams:Number($('editSugarGrams').value||0),flavor:$('editFlavor').value.trim(),notes:$('editNotes').value.trim(),extendDays:Number($('editExtendDays').value||0)};
+  const d=dataFor(b);
+  const payload={id,phase:$('editPhase').value,name:$('editName').value.trim(),days:Number(d.days||1),liters:Number($('editLiters').value||0),teaGrams:Number($('editTeaGrams').value||0),sugarGrams:Number($('editSugarGrams').value||0),flavor:$('editFlavor').value.trim(),notes:$('editNotes').value.trim(),extendDays:Number($('editAdjustDays').value||0)};
   try { upsertLocal(optimisticUpdate(b,payload)); queueOp('updateBatch',payload); hide('editModal'); toast('Modifications enregistrées localement.'); }
   catch(err){toast(err.message,'warn')} finally{btn.disabled=false;}
 });

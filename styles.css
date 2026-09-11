@@ -113,3 +113,15 @@ button:focus,button:active{outline:none}
 /* v14: floating + aligned with the navigation bar */
 .fab-add{position:fixed!important;top:auto!important;right:20px!important;bottom:18px!important;transform:none!important;}
 @media(max-width:640px){.fab-add{right:13px!important;bottom:15px!important;width:58px!important;height:58px!important}}
+
+
+/* v15 - refined duration controls and completion action */
+:root{--vibrant-coral:#B3684A;--lemon-chiffon:#FFD216;--ash-grey:#519C7C;--taupe-grey:#B3684A;--soft-linen:#f7f3ec;}
+.complete-action{background:var(--ash-grey)!important;color:#fff!important;border-color:var(--ash-grey)!important;}
+.stepper{width:fit-content!important;min-width:0!important;max-width:none!important;min-height:48px!important;height:52px!important;margin:6px auto 0!important;padding:4px!important;border-radius:24px!important;background:var(--lemon-chiffon)!important;box-shadow:0 3px 10px rgba(93,87,107,.08)!important;overflow:visible!important;}
+.stepper-btn{width:42px!important;min-width:42px!important;height:44px!important;border-radius:20px!important;background:transparent!important;color:var(--taupe-grey)!important;font-size:24px!important;font-weight:600!important;}
+.stepper-value{flex:0 0 50px!important;width:50px!important;height:44px!important;background:transparent!important;border-radius:18px!important;box-shadow:none!important;padding:0!important;}
+.stepper-value input{width:38px!important;font-size:20px!important;font-weight:800!important;color:var(--taupe-grey)!important;padding:6px 0!important;}
+.stepper-value span{display:none!important;}
+.stepper-btn:active,.stepper-btn:focus,.stepper-btn:hover{background:transparent!important;color:var(--taupe-grey)!important;outline:none!important;box-shadow:none!important;}
+@media(max-width:640px){.stepper{height:50px!important;min-height:46px!important;padding:3px!important}.stepper-btn{width:38px!important;min-width:38px!important;height:42px!important;font-size:22px!important}.stepper-value{flex-basis:46px!important;width:46px!important;height:42px!important}.stepper-value input{font-size:19px!important;width:34px!important}}

@@ -61,7 +61,7 @@
       <form id="batchForm" class="form-grid">
         <input id="batchId" type="hidden">
         <input id="batchName" type="hidden">
-        <label><span>Durée F1</span><div class="stepper" data-stepper="batchF1Days"><button type="button" class="stepper-btn" data-step="-1" aria-label="Diminuer">−</button><div class="stepper-value"><input id="batchF1Days" type="number" min="1" max="365" step="1" required><span>jours</span></div><button type="button" class="stepper-btn" data-step="1" aria-label="Augmenter">+</button></div></label>
+        <label><span>Durée</span><div class="stepper" data-stepper="batchF1Days"><button type="button" class="stepper-btn" data-step="-1" aria-label="Diminuer">−</button><div class="stepper-value"><input id="batchF1Days" type="number" min="1" max="365" step="1" required><span>jours</span></div><button type="button" class="stepper-btn" data-step="1" aria-label="Augmenter">+</button></div></label>
         <label><span>Litres</span><div class="input-unit"><input id="batchLiters" type="number" min="0.1" max="500" step="0.1"><b>L</b></div></label>
         <label><span>Thé</span><div class="input-unit"><input id="batchTeaGrams" type="number" min="0" max="10000" step="1" placeholder=""><b>g</b></div></label>
         <label><span>Sucre</span><div class="input-unit"><input id="batchSugarGrams" type="number" min="0" max="10000" step="1" placeholder=""><b>g</b></div></label>
@@ -77,7 +77,7 @@
       <div class="modal-header"><div><div class="eyebrow">DEUXIÈME FERMENTATION</div><h2 id="f2ModalTitle">Passer en F2</h2></div><button class="icon-btn" data-close-modal type="button" aria-label="Fermer">×</button></div>
       <form id="f2Form" class="form-grid">
         <input id="f2BatchId" type="hidden">
-        <label><span>Durée F2</span><div class="stepper" data-stepper="f2Days"><button type="button" class="stepper-btn" data-step="-1" aria-label="Diminuer">−</button><div class="stepper-value"><input id="f2Days" type="number" min="1" max="60" step="1" required><span>jours</span></div><button type="button" class="stepper-btn" data-step="1" aria-label="Augmenter">+</button></div></label>
+        <label><span>Durée</span><div class="stepper" data-stepper="f2Days"><button type="button" class="stepper-btn" data-step="-1" aria-label="Diminuer">−</button><div class="stepper-value"><input id="f2Days" type="number" min="1" max="60" step="1" required><span>jours</span></div><button type="button" class="stepper-btn" data-step="1" aria-label="Augmenter">+</button></div></label>
         <label><span>Parfum</span><input id="f2Flavor" maxlength="120" placeholder="Ex. gingembre-citron"></label>
         <label class="wide"><span>Notes</span><textarea id="f2Notes" maxlength="500" placeholder="Mise en bouteille, parfum, température…"></textarea></label>
         
@@ -92,10 +92,9 @@
       <form id="editForm" class="form-grid">
         <input id="editId" type="hidden"><input id="editPhase" type="hidden">
         <label><span>Nom</span><input id="editName" required maxlength="80"></label>
-        <label><span>Durée</span><div class="stepper" data-stepper="editDays"><button type="button" class="stepper-btn" data-step="-1" aria-label="Diminuer">−</button><div class="stepper-value"><input id="editDays" type="number" min="1" max="365" required><span>jours</span></div><button type="button" class="stepper-btn" data-step="1" aria-label="Augmenter">+</button></div></label>
+        <label><span>Ajuster durée</span><div class="stepper stepper-adjust" data-stepper="editAdjustDays"><button type="button" class="stepper-btn" data-step="-1" aria-label="Diminuer">−</button><div class="stepper-value"><input id="editAdjustDays" type="number" min="-365" max="365" step="1" value="0" required><span>jours</span></div><button type="button" class="stepper-btn" data-step="1" aria-label="Augmenter">+</button></div></label>
         <div id="editMaterialWrap" class="wide material-row"><label><span>Litres</span><div class="input-unit"><input id="editLiters" type="number" min="0.1" max="500" step="0.1"><b>L</b></div></label><label><span>Thé</span><div class="input-unit"><input id="editTeaGrams" type="number" min="0" max="10000" step="1"><b>g</b></div></label><label><span>Sucre</span><div class="input-unit"><input id="editSugarGrams" type="number" min="0" max="10000" step="1"><b>g</b></div></label></div>
         <label id="editFlavorWrap" class="wide"><span>Parfum</span><input id="editFlavor" maxlength="120"></label>
-        <div class="wide extension-panel"><span class="extension-title">Ajuster la durée</span><div class="extend-options" data-target="editExtendDays"><button type="button" class="extend-btn" data-value="-3">−3 j</button><button type="button" class="extend-btn" data-value="-1">−1 j</button><button type="button" class="extend-btn active" data-value="0">0</button><button type="button" class="extend-btn" data-value="1">+1 j</button><button type="button" class="extend-btn" data-value="3">+3 j</button><button type="button" class="extend-btn" data-value="7">+7 j</button></div><input id="editExtendDays" type="hidden" value="0"><div class="wheel-value" data-for="editExtendDays">Aucun changement</div></div>
         <label class="wide"><span>Notes</span><textarea id="editNotes" maxlength="500"></textarea></label>
         <div class="wide actions edit-actions"><button id="editToF2" class="secondary-action full" type="button">Passer en F2</button><button class="primary-btn full" type="submit">Enregistrer</button></div>
       </form>
@@ -103,6 +102,6 @@
   </div>
 
   <div id="toast" class="toast" aria-live="polite"></div>
-  <script src="config.js"></script><script src="app.js?v=13"></script>
+  <script src="config.js"></script><script src="app.js?v=15"></script>
 </body>
 </html>
