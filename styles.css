@@ -136,3 +136,26 @@ button:focus,button:active{outline:none}
 .stepper-value input{width:38px!important;font-size:19px!important;text-align:center!important;}
 .stepper-btn:focus,.stepper-btn:active,.stepper-btn:hover{outline:none!important;background:transparent!important;-webkit-tap-highlight-color:transparent!important;}
 @media(max-width:640px){.stepper{width:180px!important;min-width:180px!important;max-width:180px!important;}.stepper-btn{width:39px!important;min-width:39px!important;height:40px!important;font-size:22px!important;}.stepper-value{flex-basis:50px!important;width:50px!important;height:40px!important;}.stepper-value input{width:34px!important;font-size:18px!important;}}
+
+/* v17 - requested visual refinements */
+.fab-add{
+  background:#FFD216!important;
+  color:#5d4b00!important;
+  border-color:#fff!important;
+  box-shadow:0 10px 24px rgba(93,87,107,.16)!important;
+}
+.fab-add span{color:#5d4b00!important;font-weight:400!important;}
+
+.stepper{
+  background:#FFD216!important;
+}
+.stepper-btn,
+.stepper-value input{
+  color:#5d4b00!important;
+}
+.stepper-btn{font-weight:700!important;}
+.stepper-value input{font-weight:800!important;}
+.stepper-btn:active,.stepper-btn:focus,.stepper-btn:hover{
+  color:#5d4b00!important;
+  background:transparent!important;
+}
