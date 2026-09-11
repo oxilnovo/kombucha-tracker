@@ -10,12 +10,50 @@ function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt
 function fmt(iso){return iso?new Date(iso).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'}):'—'}
 function duration(ms){if(ms<=0)return 'Terminé';const d=Math.floor(ms/86400000),h=Math.floor(ms/3600000)%24,m=Math.floor(ms/60000)%60;return `${d}j ${String(h).padStart(2,'0')}h ${String(m).padStart(2,'0')}m`}
 function dataFor(b){return b.phase==='F2'?{start:b.f2StartAt,end:b.f2EndAt,days:b.f2Days}:{start:b.f1StartAt,end:b.f1EndAt,days:b.f1Days}}
-function card(b,done){const d=dataFor(b),rating=Number(b.rating||0);const details=`<div class="details"><div class="detail"><small>Litres</small><strong>${esc(b.liters??'—')} L</strong></div><div class="detail"><small>Thé</small><strong>${esc(b.teaGrams??'—')} g</strong></div><div class="detail"><small>Sucre</small><strong>${esc(b.sugarGrams??'—')} g</strong></div><div class="detail"><small>Durée ${esc(b.phase)}</small><strong>${esc(d.days)} j</strong></div><div class="detail"><small>Démarrée</small><strong>${esc(fmt(d.start))}</strong></div><div class="detail"><small>Fin prévue</small><strong>${esc(fmt(d.end))}</strong></div></div>`;
-const actions=done?'':`<div class="card-actions">${b.phase==='F1'?`<button class="secondary-action" data-action="f2" data-id="${esc(b.id)}">Passer en F2</button>`:''}<button class="primary-btn" data-action="edit" data-id="${esc(b.id)}">Modifier</button></div>`;
-const ratingHtml=done?`<div class="rating-row"><span class="meta">Votre note</span><div class="rating-buttons">${faces.map((f,i)=>`<button class="rating-btn ${rating===i+1?'selected':''}" data-action="rate" data-rating="${i+1}" data-id="${esc(b.id)}">${f}</button>`).join('')}</div></div>`:'';
-return `<article class="batch-card"><div class="card-top"><div><p class="card-name">${esc(b.name)}</p><div class="meta">Créé le ${esc(fmt(b.createdAt))}</div></div><span class="badge ${done?'done':b.phase.toLowerCase()}">${done?'Terminé':b.phase}</span></div><div class="countdown"><div class="count-label">${done?'FERMENTATION TERMINÉE':`COMPTE À REBOURS · ${b.phase}`}</div><div class="timer ${done?'done':''}" data-end="${esc(d.end)}">${done?'Terminé':duration(new Date(d.end)-Date.now())}</div>${done?'':`<div class="progress"><i data-start="${esc(d.start)}" data-end="${esc(d.end)}"></i></div>`}</div>${b.phase==='F2'&&b.flavor?`<p class="card-note"><strong>Parfum :</strong> ${esc(b.flavor)}</p>`:''}${b.f1Notes?`<p class="card-note">${esc(b.phase==='F1'?b.f1Notes:b.f1Notes)}</p>`:''}${b.f2Notes?`<p class="card-note">${esc(b.f2Notes)}</p>`:''}${details}${actions}${ratingHtml}</article>`}
+function ringPct(start,end,done=false){
+  if(done) return 100;
+  const s=new Date(start).getTime(), e=new Date(end).getTime(), now=Date.now();
+  if(!Number.isFinite(s)||!Number.isFinite(e)||e<=s) return 0;
+  return Math.min(100,Math.max(0,(now-s)/(e-s)*100));
+}
+function card(b,done){
+  const d=dataFor(b), rating=Number(b.rating||0), left=Math.max(0,new Date(d.end)-Date.now());
+  const totalDays=Math.max(1,Math.floor(left/86400000));
+  const pct=ringPct(d.start,d.end,done);
+  const phaseClass=b.phase==='F2'?'f2':'f1';
+  const tags=[
+    b.liters!==''&&b.liters!=null?`<span class="mini-tag"><strong>${esc(b.liters)}</strong> L</span>`:'',
+    b.teaGrams!==''&&b.teaGrams!=null?`<span class="mini-tag">Thé <strong>${esc(b.teaGrams)}g</strong></span>`:'',
+    b.sugarGrams!==''&&b.sugarGrams!=null?`<span class="mini-tag">Sucre <strong>${esc(b.sugarGrams)}g</strong></span>`:'',
+    b.flavor?`<span class="mini-tag">${esc(b.flavor)}</span>`:''
+  ].filter(Boolean).join('');
+  const actions=done?'':`<div class="card-actions">${b.phase==='F1'?`<button class="secondary-action" data-action="f2" data-id="${esc(b.id)}">Passer en F2</button>`:''}<button class="primary-btn" data-action="edit" data-id="${esc(b.id)}">Modifier</button></div>`;
+  const ratingHtml=done?`<div class="rating-row"><span class="countdown-text">Votre note</span><div class="rating-buttons">${faces.map((f,i)=>`<button class="rating-btn ${rating===i+1?'selected':''}" data-action="rate" data-rating="${i+1}" data-id="${esc(b.id)}">${f}</button>`).join('')}</div></div>`:'';
+  const date = d.start ? new Date(d.start).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) : '—';
+  const timerValue = done ? '✓' : duration(left).replace(/\b\d+s?\b/g,'');
+  return `<article class="batch-card">
+    <div class="batch-main">
+      <div class="phase-pill ${phaseClass}">${esc(b.phase)}</div>
+      <div>
+        <p class="card-name">${esc(b.name||'Unnamed batch')}</p>
+        <div class="card-date">Démarré le ${date}</div>
+        <div class="card-meta">${tags}</div>
+      </div>
+      <div class="timer-ring ${done?'timer-done':''}" style="--pct:${pct}%" data-end="${esc(d.end)}">
+        <div class="timer-content"><div class="timer-days">${done?'✓':totalDays}</div><div class="timer-small">${done?'terminé':'jours'}</div></div>
+      </div>
+    </div>
+    <div class="card-subrow">
+      <span class="countdown-text">${done?'Fermentation terminée':`Encore ${duration(left)}`}</span>
+      ${actions}
+    </div>
+    ${b.f1Notes&&b.phase==='F1'?`<p class="card-note">${esc(b.f1Notes)}</p>`:''}
+    ${b.f2Notes&&b.phase==='F2'?`<p class="card-note">${esc(b.f2Notes)}</p>`:''}
+    ${ratingHtml}
+  </article>`;
+}
 function render(){const active=state.batches.filter(b=>b.status!=='COMPLETED');const completed=state.batches.filter(b=>b.status==='COMPLETED').sort((a,b)=>new Date(b.completedAt||b.f2EndAt)-new Date(a.completedAt||a.f2EndAt));$('activeList').innerHTML=active.length?active.map(b=>card(b,false)).join(''):$('emptyTemplate').innerHTML;$('completedList').innerHTML=completed.length?completed.map(b=>card(b,true)).join(''):`<div class="empty-state"><div class="empty-icon">🌿</div><strong>Pas encore d’historique</strong><span>Les batchs terminés apparaîtront ici.</span></div>`;}
-function ticks(){document.querySelectorAll('.timer[data-end]').forEach(e=>{const diff=new Date(e.dataset.end)-Date.now();if(diff<=0){e.textContent='Terminé';e.classList.add('done');loadData(true).catch(()=>{})}else e.textContent=duration(diff)});document.querySelectorAll('.progress i').forEach(e=>{const s=new Date(e.dataset.start).getTime(),end=new Date(e.dataset.end).getTime();e.style.width=`${Math.min(100,Math.max(0,(Date.now()-s)/(end-s)*100))}%`})}
+function ticks(){document.querySelectorAll('.timer-ring[data-end]').forEach(e=>{const diff=new Date(e.dataset.end)-Date.now();const done=diff<=0;if(done){e.classList.add('timer-done');const d=e.querySelector('.timer-days');const s=e.querySelector('.timer-small');if(d)d.textContent='✓';if(s)s.textContent='terminé';}else{e.classList.remove('timer-done');const d=e.querySelector('.timer-days');if(d)d.textContent=Math.max(0,Math.floor(diff/86400000));const s=e.querySelector('.timer-small');if(s)s.textContent='jours';}});const textNodes=document.querySelectorAll('.countdown-text');textNodes.forEach(n=>{const card=n.closest('.batch-card');const ring=card?.querySelector('.timer-ring[data-end]');if(!ring)return;const diff=new Date(ring.dataset.end)-Date.now();if(diff>0)n.textContent=`Encore ${duration(diff)}`;});}
 async function loadData(silent=false){try{const d=await api('list');state.batches=d.batches||[];state.settings=d.settings||state.settings;$('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;render();ticks();banner(`${state.batches.length} batch${state.batches.length>1?'s':''} synchronisé${state.batches.length>1?'s':''}.`,'ok')}catch(e){banner(e.message,'error');if(!silent)toast(e.message);throw e}}
 function page(name){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active-page'));$(`page-${name}`).classList.add('active-page');document.querySelectorAll('.nav-btn').forEach(n=>n.classList.toggle('active',n.dataset.page===name))}
 function show(id){$(id).classList.remove('hidden');$(id).setAttribute('aria-hidden','false')};function hide(id){$(id).classList.add('hidden');$(id).setAttribute('aria-hidden','true')}
@@ -29,4 +67,4 @@ $('editForm').addEventListener('submit',async e=>{e.preventDefault();const btn=e
 $('settingsForm').addEventListener('submit',async e=>{e.preventDefault();try{await api('saveSettings',{defaultF1:Number($('defaultF1').value),defaultF2:Number($('defaultF2').value)});state.settings.defaultF1=Number($('defaultF1').value);state.settings.defaultF2=Number($('defaultF2').value);toast('Settings enregistrés ✅')}catch(err){toast(err.message)}});
 document.addEventListener('click',async e=>{const el=e.target.closest('[data-action]');if(!el)return;try{const a=el.dataset.action;if(a==='f2')openF2(el.dataset.id);else if(a==='edit')openEdit(el.dataset.id);else if(a==='rate'){await api('rate',{id:el.dataset.id,rating:Number(el.dataset.rating)});toast('Note enregistrée 👍');await loadData(true)}}catch(err){toast(err.message)}});
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.deferredPrompt=e;$('installBtn').classList.remove('hidden')});$('installBtn').addEventListener('click',async()=>{if(!state.deferredPrompt)return;state.deferredPrompt.prompt();await state.deferredPrompt.userChoice;state.deferredPrompt=null;$('installBtn').classList.add('hidden')});
-if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));setInterval(ticks,60000);loadData(false).catch(()=>{});
+if('serviceWorker' in navigator)window.addEventListener('load',async()=>{try{const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(r=>r.update()));await navigator.serviceWorker.register('./sw.js?v=3')}catch(_){}});setInterval(ticks,60000);loadData(false).catch(()=>{});
