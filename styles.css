@@ -125,3 +125,14 @@ button:focus,button:active{outline:none}
 .stepper-value span{display:none!important;}
 .stepper-btn:active,.stepper-btn:focus,.stepper-btn:hover{background:transparent!important;color:var(--taupe-grey)!important;outline:none!important;box-shadow:none!important;}
 @media(max-width:640px){.stepper{height:50px!important;min-height:46px!important;padding:3px!important}.stepper-btn{width:38px!important;min-width:38px!important;height:42px!important;font-size:22px!important}.stepper-value{flex-basis:46px!important;width:46px!important;height:42px!important}.stepper-value input{font-size:19px!important;width:34px!important}}
+
+
+/* v16 - fix edit, compact centered steppers, consistent phase colors */
+.phase-pill.f1{background:#FFD216!important;color:#5d4b00!important;}
+.phase-pill.f2{background:#519C7C!important;color:#fff!important;}
+.stepper{width:190px!important;min-width:190px!important;max-width:190px!important;margin:6px auto!important;display:flex!important;align-items:center!important;justify-content:center!important;}
+.stepper-btn{width:42px!important;min-width:42px!important;height:42px!important;font-size:23px!important;}
+.stepper-value{flex:0 0 54px!important;width:54px!important;height:42px!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:0!important;}
+.stepper-value input{width:38px!important;font-size:19px!important;text-align:center!important;}
+.stepper-btn:focus,.stepper-btn:active,.stepper-btn:hover{outline:none!important;background:transparent!important;-webkit-tap-highlight-color:transparent!important;}
+@media(max-width:640px){.stepper{width:180px!important;min-width:180px!important;max-width:180px!important;}.stepper-btn{width:39px!important;min-width:39px!important;height:40px!important;font-size:22px!important;}.stepper-value{flex-basis:50px!important;width:50px!important;height:40px!important;}.stepper-value input{width:34px!important;font-size:18px!important;}}

@@ -246,7 +246,7 @@ function openEdit(id) {
   const d = dataFor(b);
   $('editId').value=b.id; $('editPhase').value=b.phase; $('editName').value=b.name||''; $('editAdjustDays').value=0;
   $('editLiters').value=b.liters??''; $('editTeaGrams').value=b.teaGrams??''; $('editSugarGrams').value=b.sugarGrams??'';
-  $('editFlavor').value=b.flavor||''; $('editNotes').value=b.phase==='F2'?(b.f2Notes||''):(b.f1Notes||''); $('editExtendDays').value=0;
+  $('editFlavor').value=b.flavor||''; $('editNotes').value=b.phase==='F2'?(b.f2Notes||''):(b.f1Notes||'');
   $('editFlavorWrap').style.display=b.phase==='F2'?'grid':'none'; $('editMaterialWrap').style.display=b.phase==='F2'?'none':'grid'; $('editToF2').style.display=b.phase==='F2'?'none':'block';
   $('editModalTitle').textContent=`Modifier · ${b.name} · ${b.phase}`; show('editModal');
 }
@@ -272,7 +272,8 @@ function optimisticUpdate(b, payload) {
   const start = d.start ? new Date(d.start).getTime() : Date.now();
   const baseDays = Number(payload.days);
   const add = Number(payload.extendDays||0);
-  const end = new Date(start + (baseDays + add)*86400000).toISOString();
+  const finalDays = Math.max(1, baseDays + add);
+  const end = new Date(start + finalDays*86400000).toISOString();
   if (phase==='F1') Object.assign(next,{f1Days:finalDays,f1EndAt:end,f1Notes:payload.notes||'',f1Liters:payload.liters||'',f1TeaGrams:payload.teaGrams||'',f1SugarGrams:payload.sugarGrams||'',liters:payload.liters||'',teaGrams:payload.teaGrams||'',sugarGrams:payload.sugarGrams||''});
   else Object.assign(next,{f2Days:finalDays,f2EndAt:end,f2Notes:payload.notes||'',flavor:payload.flavor||''});
   return next;
