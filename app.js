@@ -4,10 +4,13 @@ const state = {
   queue: JSON.parse(localStorage.getItem('kb_sync_queue') || '[]'),
   deferredPrompt: null,
   syncing: false,
+  dbReady: false,
+  lastSyncAt: localStorage.getItem('kb_last_sync_at') || '',
 };
 const faces = ['😖','😕','😐','🙂','🤩'];
 const $ = id => document.getElementById(id);
-const STORAGE_KEY = 'kb_local_state_v6';
+const STORAGE_KEY = 'kb_local_state_v7';
+const DB_NAME='kombucha-tracker'; const DB_VERSION=1; const DB_STATE='state'; const DB_QUEUE='queue';
 
 function apiUrl(params) {
   const base = window.KOMBUCHA_CONFIG?.API_URL || '';
@@ -43,22 +46,15 @@ async function api(action, payload = {}) {
   return response.data;
 }
 
-function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ batches: state.batches, settings: state.settings }));
-  localStorage.setItem('kb_sync_queue', JSON.stringify(state.queue));
-}
-
-function loadLocal() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return false;
-    const saved = JSON.parse(raw);
-    state.batches = Array.isArray(saved.batches) ? saved.batches : [];
-    state.settings = { ...state.settings, ...(saved.settings || {}) };
-    return true;
-  } catch (_) { return false; }
-}
-
+let dbPromise;
+function openDB(){if(!('indexedDB' in window))return Promise.resolve(null);if(dbPromise)return dbPromise;dbPromise=new Promise((resolve,reject)=>{const r=indexedDB.open(DB_NAME,DB_VERSION);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(DB_STATE))db.createObjectStore(DB_STATE);if(!db.objectStoreNames.contains(DB_QUEUE))db.createObjectStore(DB_QUEUE,{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)}).catch(()=>null);return dbPromise}
+async function idbGet(store,key){const db=await openDB();if(!db)return null;return new Promise(res=>{const t=db.transaction(store,'readonly');const r=t.objectStore(store).get(key);r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)})}
+async function idbPut(store,value,key){const db=await openDB();if(!db)return;await new Promise(res=>{const t=db.transaction(store,'readwrite');t.objectStore(store).put(value,key);t.oncomplete=res;t.onerror=res})}
+async function idbReplaceQueue(q){const db=await openDB();if(!db)return;await new Promise(res=>{const t=db.transaction(DB_QUEUE,'readwrite');const os=t.objectStore(DB_QUEUE);os.clear();q.forEach(op=>os.put(op));t.oncomplete=res;t.onerror=res})}
+async function hydrateFromIDB(){const saved=await idbGet(DB_STATE,'snapshot');const queued=await idbGet(DB_QUEUE,'all');if(saved&&Array.isArray(saved.batches)){state.batches=saved.batches;state.settings={...state.settings,...(saved.settings||{})}}if(Array.isArray(queued))state.queue=queued;state.dbReady=true;persist();$('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;render();ticks()}
+function persistLocal(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({batches:state.batches,settings:state.settings}));localStorage.setItem('kb_sync_queue',JSON.stringify(state.queue));if(state.lastSyncAt)localStorage.setItem('kb_last_sync_at',state.lastSyncAt)}catch(_){}}
+function persist(){persistLocal();if(state.dbReady){idbPut(DB_STATE,{batches:state.batches,settings:state.settings},'snapshot');idbReplaceQueue(state.queue)}}
+function loadLocal(){try{const raw=localStorage.getItem(STORAGE_KEY)||localStorage.getItem('kb_local_state_v6');if(!raw)return false;const saved=JSON.parse(raw);state.batches=Array.isArray(saved.batches)?saved.batches:[];state.settings={...state.settings,...(saved.settings||{})};return true}catch(_){return false}}
 function toast(t, tone='info') {
   const e = $('toast');
   e.textContent = t;
@@ -116,54 +112,11 @@ function removeLocal(id) {
   render();
 }
 
-function queueOp(action, payload) {
-  state.queue.push({ id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`, action, payload });
-  persist();
-  syncQueue({ silent: true });
-}
-
-async function syncQueue({ silent = true } = {}) {
-  if (state.syncing || !navigator.onLine || !state.queue.length) return;
-  state.syncing = true;
-  if (!silent) setSyncStatus('Synchronisation…', 'info');
-  try {
-    while (state.queue.length && navigator.onLine) {
-      const op = state.queue[0];
-      const data = await api(op.action, op.payload);
-      if (op.action === 'saveSettings' && data) state.settings = { ...state.settings, ...data };
-      state.queue.shift();
-      persist();
-    }
-    if (!state.queue.length) {
-      await refreshFromServer({ silent: true });
-      setSyncStatus('Synchronisé', 'ok');
-    }
-  } catch (e) {
-    if (!silent) toast('Connexion lente : les modifications restent enregistrées sur cet appareil.', 'warn');
-    setSyncStatus('Hors ligne · synchronisation en attente', 'warn');
-  } finally {
-    state.syncing = false;
-  }
-}
-
-async function refreshFromServer({ silent = true } = {}) {
-  if (!navigator.onLine) return false;
-  try {
-    const d = await api('list');
-    state.batches = d.batches || [];
-    state.settings = d.settings || state.settings;
-    persist();
-    $('defaultF1').value = state.settings.defaultF1;
-    $('defaultF2').value = state.settings.defaultF2;
-    render();
-    ticks();
-    if (!silent) setSyncStatus(`${state.batches.length} batch${state.batches.length > 1 ? 's' : ''} synchronisé${state.batches.length > 1 ? 's' : ''}.`, 'ok');
-    return true;
-  } catch (e) {
-    if (!silent) setSyncStatus('Mode local · serveur momentanément indisponible', 'warn');
-    return false;
-  }
-}
+function queueOp(action,payload){const op={id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,action,payload,attempts:0,nextAttemptAt:0,createdAt:Date.now()};state.queue.push(op);persist();updateSyncBanner();syncQueue({silent:true})}
+function backoffMs(a){return Math.min(120000,Math.max(1500,2000*Math.pow(2,Math.min(a,6))))}
+function updateSyncBanner(){if(!navigator.onLine)return setSyncStatus(`Hors connexion · ${state.queue.length} modification${state.queue.length>1?'s':''} en attente`,'warn');if(state.syncing)return setSyncStatus('Synchronisation en cours…','info');if(state.queue.length)return setSyncStatus(`${state.queue.length} modification${state.queue.length>1?'s':''} en attente`,'warn');if(state.lastSyncAt){const d=new Date(state.lastSyncAt);return setSyncStatus(`Synchronisé à ${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`,'ok')}setSyncStatus('Prêt','ok')}
+async function syncQueue({silent=true}={}){if(state.syncing||!state.queue.length||!navigator.onLine||document.visibilityState==='hidden')return;state.syncing=true;updateSyncBanner();try{while(state.queue.length&&navigator.onLine){const op=state.queue[0];if(op.nextAttemptAt&&Date.now()<op.nextAttemptAt)break;try{const data=await api(op.action,op.payload);if(op.action==='saveSettings'&&data)state.settings={...state.settings,...data};state.queue.shift();persist()}catch(err){op.attempts=(op.attempts||0)+1;op.nextAttemptAt=Date.now()+backoffMs(op.attempts);persist();break}}if(!state.queue.length){await refreshFromServer({silent:true});state.lastSyncAt=new Date().toISOString();persist()}}finally{state.syncing=false;updateSyncBanner()}}
+async function refreshFromServer({silent=true}={}){if(!navigator.onLine||state.queue.length||state.syncing)return false;try{const d=await api('list');state.batches=d.batches||[];state.settings=d.settings||state.settings;state.lastSyncAt=new Date().toISOString();persist();$('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;render();ticks();updateSyncBanner();return true}catch(_){updateSyncBanner();return false}}
 
 function card(b, done) {
   const d = dataFor(b);
@@ -382,16 +335,10 @@ document.addEventListener('keydown', e=>{if(e.key==='Escape')closeAllModals()});
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.deferredPrompt=e;$('installBtn').classList.remove('hidden')});
 $('installBtn').addEventListener('click',async()=>{if(!state.deferredPrompt)return;state.deferredPrompt.prompt();await state.deferredPrompt.userChoice;state.deferredPrompt=null;$('installBtn').classList.add('hidden')});
 
-if('serviceWorker' in navigator) window.addEventListener('load',async()=>{try{const regs=await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r=>r.update())); await navigator.serviceWorker.register('./sw.js?v=6')}catch(_){}});
+if('serviceWorker' in navigator) window.addEventListener('load',async()=>{try{const regs=await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r=>r.update())); await navigator.serviceWorker.register('./sw.js?v=7')}catch(_){}});
 
 loadLocal();
-$('defaultF1').value=state.settings.defaultF1;
-$('defaultF2').value=state.settings.defaultF2;
-render();
-ticks();
-setSyncStatus(state.queue.length ? 'Données locales · synchronisation en attente' : (navigator.onLine ? 'Chargement des données…' : 'Mode local · hors connexion'), state.queue.length ? 'warn' : 'info');
-if (navigator.onLine) {
-  (async()=>{ await syncQueue({silent:true}); await refreshFromServer({silent:false}); })();
-}
+$('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;render();ticks();updateSyncBanner();
+(async()=>{await hydrateFromIDB();if(navigator.onLine){await syncQueue({silent:true});await refreshFromServer({silent:true})}})();
 setInterval(ticks,60000);
-setInterval(()=>syncQueue({silent:true}),30000);
+setInterval(()=>{if(document.visibilityState!=='hidden'){syncQueue({silent:true});if(!state.queue.length)refreshFromServer({silent:true})}},30000);
