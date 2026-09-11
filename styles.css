@@ -159,8 +159,3 @@ button:focus,button:active{outline:none}
   color:#5d4b00!important;
   background:transparent!important;
 }
-
-
-/* v21 - restore the original dark top banner */
-.hero{background:#5d576b!important;}
-.hero-title{color:#fff9f5!important;}

@@ -4,7 +4,7 @@
   "start_url": "./",
   "display": "standalone",
   "background_color": "#E6EBE0",
-  "theme_color": "#FFD216",
+  "theme_color": "#D6BF0F",
   "description": "Suivi partagé des fermentations de kombucha",
   "icons": [
     {
