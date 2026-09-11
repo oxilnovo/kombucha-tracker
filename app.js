@@ -1,70 +1,397 @@
-const state = { batches: [], settings: { defaultF1: 7, defaultF2: 2 }, deferredPrompt: null };
+const state = {
+  batches: [],
+  settings: { defaultF1: 7, defaultF2: 2 },
+  queue: JSON.parse(localStorage.getItem('kb_sync_queue') || '[]'),
+  deferredPrompt: null,
+  syncing: false,
+};
 const faces = ['😖','😕','😐','🙂','🤩'];
 const $ = id => document.getElementById(id);
-function apiUrl(params){const base=window.KOMBUCHA_CONFIG?.API_URL||'';if(!base||base.includes('PASTE_YOUR'))throw new Error('URL Apps Script non configurée dans config.js.');return `${base}?${new URLSearchParams(params)}`;}
-function jsonp(params){return new Promise((resolve,reject)=>{const cb=`kb_${Date.now()}_${Math.floor(Math.random()*10000)}`,s=document.createElement('script');const t=setTimeout(()=>{cleanup();reject(new Error('Le serveur ne répond pas.'));},20000);function cleanup(){clearTimeout(t);delete window[cb];s.remove()}window[cb]=d=>{cleanup();resolve(d)};s.onerror=()=>{cleanup();reject(new Error('Erreur de communication avec Google Apps Script.'))};params.callback=cb;s.src=apiUrl(params);document.head.appendChild(s)})}
-async function api(action,payload={}){const response=await jsonp({action,payload:encodeURIComponent(JSON.stringify(payload))});if(!response?.ok)throw new Error(response?.error||'Erreur inconnue');return response.data}
-function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('show'),2800)}
-function banner(t,k='info'){const e=$('connectionBanner');e.textContent=t;e.className=`banner ${k}`}
-function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function fmt(iso){return iso?new Date(iso).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'}):'—'}
-function duration(ms){if(ms<=0)return 'Terminé';const d=Math.floor(ms/86400000),h=Math.floor(ms/3600000)%24,m=Math.floor(ms/60000)%60;return `${d}j ${String(h).padStart(2,'0')}h ${String(m).padStart(2,'0')}m`}
-function dataFor(b){return b.phase==='F2'?{start:b.f2StartAt,end:b.f2EndAt,days:b.f2Days}:{start:b.f1StartAt,end:b.f1EndAt,days:b.f1Days}}
-function ringPct(start,end,done=false){
-  if(done) return 100;
-  const s=new Date(start).getTime(), e=new Date(end).getTime(), now=Date.now();
-  if(!Number.isFinite(s)||!Number.isFinite(e)||e<=s) return 0;
-  return Math.min(100,Math.max(0,(now-s)/(e-s)*100));
+const STORAGE_KEY = 'kb_local_state_v6';
+
+function apiUrl(params) {
+  const base = window.KOMBUCHA_CONFIG?.API_URL || '';
+  if (!base || base.includes('PASTE_YOUR')) throw new Error('URL Apps Script non configurée dans config.js.');
+  return `${base}?${new URLSearchParams(params)}`;
 }
-function card(b,done){
-  const d=dataFor(b), rating=Number(b.rating||0), left=Math.max(0,new Date(d.end)-Date.now());
-  const totalDays=Math.max(1,Math.floor(left/86400000));
-  const pct=ringPct(d.start,d.end,done);
-  const phaseClass=b.phase==='F2'?'f2':'f1';
-  const tags=[
-    b.liters!==''&&b.liters!=null?`<span class="mini-tag"><strong>${esc(b.liters)}</strong> L</span>`:'',
-    b.teaGrams!==''&&b.teaGrams!=null?`<span class="mini-tag">Thé <strong>${esc(b.teaGrams)}g</strong></span>`:'',
-    b.sugarGrams!==''&&b.sugarGrams!=null?`<span class="mini-tag">Sucre <strong>${esc(b.sugarGrams)}g</strong></span>`:'',
-    b.flavor?`<span class="mini-tag">${esc(b.flavor)}</span>`:''
-  ].filter(Boolean).join('');
-  const actions=done?'':`<div class="card-actions">${b.phase==='F1'?`<button class="secondary-action" data-action="f2" data-id="${esc(b.id)}">Passer en F2</button>`:''}<button class="primary-btn" data-action="edit" data-id="${esc(b.id)}">Modifier</button></div>`;
-  const ratingHtml=done?`<div class="rating-row"><span class="countdown-text">Votre note</span><div class="rating-buttons">${faces.map((f,i)=>`<button class="rating-btn ${rating===i+1?'selected':''}" data-action="rate" data-rating="${i+1}" data-id="${esc(b.id)}">${f}</button>`).join('')}</div></div>`:'';
-  const date = d.start ? new Date(d.start).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) : '—';
-  const timerValue = done ? '✓' : duration(left).replace(/\b\d+s?\b/g,'');
-  return `<article class="batch-card">
+
+function jsonp(params, timeoutMs = 9000) {
+  return new Promise((resolve, reject) => {
+    const cb = `kb_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    const s = document.createElement('script');
+    let settled = false;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(t);
+      delete window[cb];
+      s.remove();
+      fn(value);
+    };
+    const t = setTimeout(() => finish(reject, new Error('Serveur indisponible pour le moment.')), timeoutMs);
+    window[cb] = d => finish(resolve, d);
+    s.onerror = () => finish(reject, new Error('Connexion impossible avec Google Sheets.'));
+    params.callback = cb;
+    s.src = apiUrl(params);
+    document.head.appendChild(s);
+  });
+}
+
+async function api(action, payload = {}) {
+  const response = await jsonp({ action, payload: encodeURIComponent(JSON.stringify(payload)) });
+  if (!response?.ok) throw new Error(response?.error || 'Erreur inconnue');
+  return response.data;
+}
+
+function persist() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ batches: state.batches, settings: state.settings }));
+  localStorage.setItem('kb_sync_queue', JSON.stringify(state.queue));
+}
+
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    state.batches = Array.isArray(saved.batches) ? saved.batches : [];
+    state.settings = { ...state.settings, ...(saved.settings || {}) };
+    return true;
+  } catch (_) { return false; }
+}
+
+function toast(t, tone='info') {
+  const e = $('toast');
+  e.textContent = t;
+  e.dataset.tone = tone;
+  e.classList.add('show');
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => e.classList.remove('show'), 2800);
+}
+
+function banner(t, k='info') {
+  const e = $('connectionBanner');
+  e.textContent = t;
+  e.className = `banner ${k}`;
+}
+
+function setSyncStatus(text, tone='info') { banner(text, tone); }
+
+function esc(v='') {
+  return String(v).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+}
+
+function duration(ms) {
+  if (ms <= 0) return 'Terminé';
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor(ms / 3600000) % 24;
+  const m = Math.floor(ms / 60000) % 60;
+  return `${d}j ${String(h).padStart(2,'0')}h ${String(m).padStart(2,'0')}m`;
+}
+
+function dataFor(b) {
+  return b.phase === 'F2'
+    ? { start: b.f2StartAt, end: b.f2EndAt, days: b.f2Days }
+    : { start: b.f1StartAt, end: b.f1EndAt, days: b.f1Days };
+}
+
+function ringPct(start, end, done=false) {
+  if (done) return 100;
+  const s = new Date(start).getTime(), e = new Date(end).getTime(), now = Date.now();
+  if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) return 0;
+  return Math.min(100, Math.max(0, ((now - s) / (e - s)) * 100));
+}
+
+function upsertLocal(batch) {
+  const i = state.batches.findIndex(b => b.id === batch.id);
+  if (i >= 0) state.batches[i] = batch;
+  else state.batches.push(batch);
+  persist();
+  render();
+  ticks();
+}
+
+function removeLocal(id) {
+  state.batches = state.batches.filter(b => b.id !== id);
+  persist();
+  render();
+}
+
+function queueOp(action, payload) {
+  state.queue.push({ id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`, action, payload });
+  persist();
+  syncQueue({ silent: true });
+}
+
+async function syncQueue({ silent = true } = {}) {
+  if (state.syncing || !navigator.onLine || !state.queue.length) return;
+  state.syncing = true;
+  if (!silent) setSyncStatus('Synchronisation…', 'info');
+  try {
+    while (state.queue.length && navigator.onLine) {
+      const op = state.queue[0];
+      const data = await api(op.action, op.payload);
+      if (op.action === 'saveSettings' && data) state.settings = { ...state.settings, ...data };
+      state.queue.shift();
+      persist();
+    }
+    if (!state.queue.length) {
+      await refreshFromServer({ silent: true });
+      setSyncStatus('Synchronisé', 'ok');
+    }
+  } catch (e) {
+    if (!silent) toast('Connexion lente : les modifications restent enregistrées sur cet appareil.', 'warn');
+    setSyncStatus('Hors ligne · synchronisation en attente', 'warn');
+  } finally {
+    state.syncing = false;
+  }
+}
+
+async function refreshFromServer({ silent = true } = {}) {
+  if (!navigator.onLine) return false;
+  try {
+    const d = await api('list');
+    state.batches = d.batches || [];
+    state.settings = d.settings || state.settings;
+    persist();
+    $('defaultF1').value = state.settings.defaultF1;
+    $('defaultF2').value = state.settings.defaultF2;
+    render();
+    ticks();
+    if (!silent) setSyncStatus(`${state.batches.length} batch${state.batches.length > 1 ? 's' : ''} synchronisé${state.batches.length > 1 ? 's' : ''}.`, 'ok');
+    return true;
+  } catch (e) {
+    if (!silent) setSyncStatus('Mode local · serveur momentanément indisponible', 'warn');
+    return false;
+  }
+}
+
+function card(b, done) {
+  const d = dataFor(b);
+  const rating = Number(b.rating || 0);
+  const left = Math.max(0, new Date(d.end) - Date.now());
+  const daysLeft = Math.max(0, Math.floor(left / 86400000));
+  const pct = ringPct(d.start, d.end, done);
+  const phaseClass = b.phase === 'F2' ? 'f2' : 'f1';
+  const tags = (b.phase === 'F1' ? [
+    b.liters !== '' && b.liters != null ? `<span class="mini-tag"><strong>${esc(b.liters)}</strong> L</span>` : '',
+    b.teaGrams !== '' && b.teaGrams != null ? `<span class="mini-tag">Thé <strong>${esc(b.teaGrams)}g</strong></span>` : '',
+    b.sugarGrams !== '' && b.sugarGrams != null ? `<span class="mini-tag">Sucre <strong>${esc(b.sugarGrams)}g</strong></span>` : ''
+  ] : [b.flavor ? `<span class="mini-tag">${esc(b.flavor)}</span>` : '']).filter(Boolean).join('');
+  const actions = `<div class="card-actions">
+    ${!done && b.phase === 'F1' ? `<button class="secondary-action" data-action="f2" data-id="${esc(b.id)}">Passer en F2</button>` : ''}
+    <button class="icon-action edit-action" data-action="edit" data-id="${esc(b.id)}" aria-label="Modifier">✎</button>
+    <button class="icon-action delete-action" data-action="delete" data-id="${esc(b.id)}" aria-label="Supprimer">🗑</button>
+  </div>`;
+  const ratingHtml = done ? `<div class="rating-row"><span class="countdown-text">Votre note</span><div class="rating-buttons">${faces.map((f,i)=>`<button class="rating-btn ${rating===i+1?'selected':''}" data-action="rate" data-rating="${i+1}" data-id="${esc(b.id)}">${f}</button>`).join('')}</div></div>` : '';
+  const date = d.start ? new Date(d.start).toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'}) : '—';
+  return `<article class="batch-card ${done ? 'is-done' : ''}">
     <div class="batch-main">
       <div class="phase-pill ${phaseClass}">${esc(b.phase)}</div>
-      <div>
-        <p class="card-name">${esc(b.name||'Unnamed batch')}</p>
+      <div class="batch-copy">
+        <p class="card-name">${esc(b.name || 'Batch')}</p>
         <div class="card-date">Démarré le ${date}</div>
-        <div class="card-meta">${tags}</div>
+        <div class="card-meta">${tags || '<span class="muted-text">Aucun détail</span>'}</div>
       </div>
-      <div class="timer-ring ${done?'timer-done':''}" style="--pct:${pct}%" data-end="${esc(d.end)}">
-        <div class="timer-content"><div class="timer-days">${done?'✓':totalDays}</div><div class="timer-small">${done?'terminé':'jours'}</div></div>
+      <div class="timer-ring ${done ? 'timer-done' : ''}" style="--pct:${pct}%" data-end="${esc(d.end)}">
+        <div class="timer-content"><div class="timer-days">${done ? '✓' : daysLeft}</div><div class="timer-small">${done ? 'terminé' : 'jours'}</div></div>
       </div>
     </div>
-    <div class="card-subrow">
-      <span class="countdown-text">${done?'Fermentation terminée':`Encore ${duration(left)}`}</span>
-      ${actions}
-    </div>
-    ${b.f1Notes&&b.phase==='F1'?`<p class="card-note">${esc(b.f1Notes)}</p>`:''}
-    ${b.f2Notes&&b.phase==='F2'?`<p class="card-note">${esc(b.f2Notes)}</p>`:''}
+    <div class="card-subrow"><span class="countdown-text">${done ? 'Fermentation terminée' : `Encore ${duration(left)}`}</span>${actions}</div>
+    ${b.f1Notes && b.phase === 'F1' ? `<p class="card-note">${esc(b.f1Notes)}</p>` : ''}
+    ${b.f2Notes && b.phase === 'F2' ? `<p class="card-note">${esc(b.f2Notes)}</p>` : ''}
     ${ratingHtml}
   </article>`;
 }
-function render(){const active=state.batches.filter(b=>b.status!=='COMPLETED');const completed=state.batches.filter(b=>b.status==='COMPLETED').sort((a,b)=>new Date(b.completedAt||b.f2EndAt)-new Date(a.completedAt||a.f2EndAt));$('activeList').innerHTML=active.length?active.map(b=>card(b,false)).join(''):$('emptyTemplate').innerHTML;$('completedList').innerHTML=completed.length?completed.map(b=>card(b,true)).join(''):`<div class="empty-state"><div class="empty-icon">🌿</div><strong>Pas encore d’historique</strong><span>Les batchs terminés apparaîtront ici.</span></div>`;}
-function ticks(){document.querySelectorAll('.timer-ring[data-end]').forEach(e=>{const diff=new Date(e.dataset.end)-Date.now();const done=diff<=0;if(done){e.classList.add('timer-done');const d=e.querySelector('.timer-days');const s=e.querySelector('.timer-small');if(d)d.textContent='✓';if(s)s.textContent='terminé';}else{e.classList.remove('timer-done');const d=e.querySelector('.timer-days');if(d)d.textContent=Math.max(0,Math.floor(diff/86400000));const s=e.querySelector('.timer-small');if(s)s.textContent='jours';}});const textNodes=document.querySelectorAll('.countdown-text');textNodes.forEach(n=>{const card=n.closest('.batch-card');const ring=card?.querySelector('.timer-ring[data-end]');if(!ring)return;const diff=new Date(ring.dataset.end)-Date.now();if(diff>0)n.textContent=`Encore ${duration(diff)}`;});}
-async function loadData(silent=false){try{const d=await api('list');state.batches=d.batches||[];state.settings=d.settings||state.settings;$('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;render();ticks();banner(`${state.batches.length} batch${state.batches.length>1?'s':''} synchronisé${state.batches.length>1?'s':''}.`,'ok')}catch(e){banner(e.message,'error');if(!silent)toast(e.message);throw e}}
-function page(name){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active-page'));$(`page-${name}`).classList.add('active-page');document.querySelectorAll('.nav-btn').forEach(n=>n.classList.toggle('active',n.dataset.page===name))}
-function show(id){$(id).classList.remove('hidden');$(id).setAttribute('aria-hidden','false')};function hide(id){$(id).classList.add('hidden');$(id).setAttribute('aria-hidden','true')}
-function openAdd(){ $('batchForm').reset();$('batchId').value='';$('batchPhase').value='F1';$('batchF1Days').value=state.settings.defaultF1;$('extendDays').value=0;$('batchModalTitle').textContent='Nouveau batch';$('batchSubmit').textContent='Démarrer la F1';show('batchModal')}
-function openF2(id){const b=state.batches.find(x=>x.id===id);if(!b)return;$('f2Form').reset();$('f2BatchId').value=id;$('f2Days').value=state.settings.defaultF2;$('f2Liters').value=b.liters??'';$('f2TeaGrams').value=b.teaGrams??'';$('f2SugarGrams').value=b.sugarGrams??'';$('f2Notes').value='';$('f2ExtendDays').value=0;$('f2ModalTitle').textContent=`F2 · ${b.name}`;show('f2Modal')}
-function openEdit(id){const b=state.batches.find(x=>x.id===id);if(!b)return;const d=dataFor(b);$('editId').value=b.id;$('editPhase').value=b.phase;$('editName').value=b.name||'';$('editDays').value=d.days||1;$('editLiters').value=b.liters??'';$('editTeaGrams').value=b.teaGrams??'';$('editSugarGrams').value=b.sugarGrams??'';$('editFlavor').value=b.flavor||'';$('editNotes').value=b.phase==='F2'?(b.f2Notes||''):(b.f1Notes||'');$('editExtendDays').value=0;$('editFlavorWrap').style.display=b.phase==='F2'?'grid':'none';$('editModalTitle').textContent=`Modifier · ${b.name} · ${b.phase}`;show('editModal')}
-$('addBtn').addEventListener('click',openAdd);$('refreshBtn').addEventListener('click',()=>loadData(false));document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>page(b.dataset.page)));['closeBatchModal','closeF2Modal','closeEditModal'].forEach(id=>$(id).addEventListener('click',()=>hide(id)));document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)hide(m.id)}));
-$('batchForm').addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter;btn.disabled=true;try{await api('createF1',{name:$('batchName').value.trim(),f1Days:Number($('batchF1Days').value),liters:Number($('batchLiters').value||0),teaGrams:Number($('batchTeaGrams').value||0),sugarGrams:Number($('batchSugarGrams').value||0),f1Notes:$('batchNotes').value.trim()});hide('batchModal');toast('Batch F1 démarré ✅');await loadData(true)}catch(err){toast(err.message)}finally{btn.disabled=false}});
-$('f2Form').addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter;btn.disabled=true;try{await api('startF2',{id:$('f2BatchId').value,f2Days:Number($('f2Days').value),liters:Number($('f2Liters').value),sugarGrams:Number($('f2SugarGrams').value||0),teaGrams:Number($('f2TeaGrams').value||0),flavor:$('f2Flavor').value.trim(),f2Notes:$('f2Notes').value.trim(),extendDays:Number($('f2ExtendDays').value||0)});hide('f2Modal');toast('F2 démarrée ✅');await loadData(true)}catch(err){toast(err.message)}finally{btn.disabled=false}});
-$('editForm').addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter;btn.disabled=true;try{await api('updateBatch',{id:$('editId').value,phase:$('editPhase').value,name:$('editName').value.trim(),days:Number($('editDays').value),liters:Number($('editLiters').value||0),teaGrams:Number($('editTeaGrams').value||0),sugarGrams:Number($('editSugarGrams').value||0),flavor:$('editFlavor').value.trim(),notes:$('editNotes').value.trim(),extendDays:Number($('editExtendDays').value||0)});hide('editModal');toast('Modifications enregistrées ✅');await loadData(true)}catch(err){toast(err.message)}finally{btn.disabled=false}});
-$('settingsForm').addEventListener('submit',async e=>{e.preventDefault();try{await api('saveSettings',{defaultF1:Number($('defaultF1').value),defaultF2:Number($('defaultF2').value)});state.settings.defaultF1=Number($('defaultF1').value);state.settings.defaultF2=Number($('defaultF2').value);toast('Settings enregistrés ✅')}catch(err){toast(err.message)}});
-document.addEventListener('click',async e=>{const el=e.target.closest('[data-action]');if(!el)return;try{const a=el.dataset.action;if(a==='f2')openF2(el.dataset.id);else if(a==='edit')openEdit(el.dataset.id);else if(a==='rate'){await api('rate',{id:el.dataset.id,rating:Number(el.dataset.rating)});toast('Note enregistrée 👍');await loadData(true)}}catch(err){toast(err.message)}});
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.deferredPrompt=e;$('installBtn').classList.remove('hidden')});$('installBtn').addEventListener('click',async()=>{if(!state.deferredPrompt)return;state.deferredPrompt.prompt();await state.deferredPrompt.userChoice;state.deferredPrompt=null;$('installBtn').classList.add('hidden')});
-if('serviceWorker' in navigator)window.addEventListener('load',async()=>{try{const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(r=>r.update()));await navigator.serviceWorker.register('./sw.js?v=3')}catch(_){}});setInterval(ticks,60000);loadData(false).catch(()=>{});
+
+function render() {
+  const active = state.batches.filter(b => b.status !== 'COMPLETED');
+  const completed = state.batches.filter(b => b.status === 'COMPLETED').sort((a,b) => new Date(b.completedAt || b.f2EndAt) - new Date(a.completedAt || a.f2EndAt));
+  $('activeList').innerHTML = active.length ? active.map(b => card(b,false)).join('') : $('emptyTemplate').innerHTML;
+  $('completedList').innerHTML = completed.length ? completed.map(b => card(b,true)).join('') : `<div class="empty-state"><div class="empty-icon">🌿</div><strong>Pas encore d’historique</strong><span>Les batchs terminés apparaîtront ici.</span></div>`;
+}
+
+function ticks() {
+  document.querySelectorAll('.timer-ring[data-end]').forEach(e => {
+    const diff = new Date(e.dataset.end) - Date.now();
+    const done = diff <= 0;
+    e.classList.toggle('timer-done', done);
+    const d = e.querySelector('.timer-days');
+    const s = e.querySelector('.timer-small');
+    if (done) { if (d) d.textContent = '✓'; if (s) s.textContent = 'terminé'; }
+    else { if (d) d.textContent = Math.floor(diff / 86400000); if (s) s.textContent = 'jours'; }
+    const cardEl = e.closest('.batch-card');
+    const text = cardEl?.querySelector('.countdown-text');
+    if (text && !cardEl.classList.contains('is-done')) text.textContent = diff > 0 ? `Encore ${duration(diff)}` : 'Fermentation terminée';
+  });
+}
+
+function page(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active-page'));
+  $(`page-${name}`).classList.add('active-page');
+  document.querySelectorAll('.nav-btn').forEach(n => n.classList.toggle('active', n.dataset.page === name));
+}
+function show(id){const el=$(id);el.classList.remove('hidden');el.setAttribute('aria-hidden','false');}
+function hide(id){const el=$(id);el.classList.add('hidden');el.setAttribute('aria-hidden','true');}
+function closeAllModals(){document.querySelectorAll('.modal').forEach(m=>hide(m.id));}
+
+function autoBatchName() {
+  const now = new Date();
+  const stamp = now.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
+  return `Batch ${stamp}`;
+}
+
+function extensionPicker(targetId) {
+  return `<div class="extend-picker"><span>Prolonger de</span><div class="extend-options" data-target="${targetId}">
+    <button type="button" data-add="0" class="extend-btn active">0</button><button type="button" data-add="1" class="extend-btn">+1</button><button type="button" data-add="2" class="extend-btn">+2</button><button type="button" data-add="3" class="extend-btn">+3</button><button type="button" data-add="7" class="extend-btn">+7</button>
+  </div><input id="${targetId}" type="hidden" value="0"></div>`;
+}
+
+function openAdd() {
+  $('batchForm').reset();
+  $('batchId').value = crypto.randomUUID ? crypto.randomUUID() : `tmp-${Date.now()}`;
+  $('batchName').value = autoBatchName();
+  $('batchF1Days').value = state.settings.defaultF1;
+  $('batchExtendDays').value = 0;
+  document.querySelectorAll('#batchForm .extend-btn').forEach(b=>b.classList.toggle('active', b.dataset.add==='0'));
+  $('batchModalTitle').textContent = 'Nouveau batch';
+  show('batchModal');
+  setTimeout(()=>$('batchName').focus(),50);
+}
+
+function openF2(id) {
+  const b = state.batches.find(x=>x.id===id); if(!b) return;
+  $('f2Form').reset();
+  $('f2BatchId').value = id;
+  $('f2Days').value = state.settings.defaultF2;
+  $('f2Flavor').value = '';
+  $('f2Notes').value = '';
+  $('f2ExtendDays').value = 0;
+  document.querySelectorAll('#f2Form .extend-btn').forEach(x=>x.classList.toggle('active', x.dataset.add==='0'));
+  $('f2ModalTitle').textContent = `F2 · ${b.name}`;
+  show('f2Modal');
+}
+
+function openEdit(id) {
+  const b = state.batches.find(x=>x.id===id); if(!b) return;
+  const d = dataFor(b);
+  $('editId').value=b.id; $('editPhase').value=b.phase; $('editName').value=b.name||''; $('editDays').value=d.days||1;
+  $('editLiters').value=b.liters??''; $('editTeaGrams').value=b.teaGrams??''; $('editSugarGrams').value=b.sugarGrams??'';
+  $('editFlavor').value=b.flavor||''; $('editNotes').value=b.phase==='F2'?(b.f2Notes||''):(b.f1Notes||''); $('editExtendDays').value=0;
+  $('editFlavorWrap').style.display=b.phase==='F2'?'grid':'none'; $('editMaterialWrap').style.display=b.phase==='F2'?'none':'grid';
+  document.querySelectorAll('#editForm .extend-btn').forEach(x=>x.classList.toggle('active', x.dataset.add==='0'));
+  $('editModalTitle').textContent=`Modifier · ${b.name} · ${b.phase}`; show('editModal');
+}
+
+function buildOptimisticF1(payload) {
+  const now = new Date().toISOString();
+  const days = Number(payload.f1Days);
+  const end = new Date(Date.now() + days*86400000).toISOString();
+  return { id: payload.id, name: payload.name, phase:'F1', status:'ACTIVE', createdAt:now, f1Days:days, f1StartAt:now, f1EndAt:end, f1Notes:payload.f1Notes||'', f1Liters:payload.liters||'', f1TeaGrams:payload.teaGrams||'', f1SugarGrams:payload.sugarGrams||'', liters:payload.liters||'', teaGrams:payload.teaGrams||'', sugarGrams:payload.sugarGrams||'', f2Days:'',f2StartAt:'',f2EndAt:'',flavor:'',f2Notes:'' };
+}
+
+function optimisticStartF2(b, payload) {
+  const now = new Date().toISOString();
+  const days = Number(payload.f2Days) + Number(payload.extendDays||0);
+  const end = new Date(Date.now() + days*86400000).toISOString();
+  return { ...b, phase:'F2', status:'ACTIVE', f2Days:days, f2StartAt:now, f2EndAt:end, flavor:payload.flavor||'', f2Notes:payload.f2Notes||'' };
+}
+
+function optimisticUpdate(b, payload) {
+  const next = {...b, name:payload.name};
+  const phase = payload.phase === 'F2' ? 'F2' : 'F1';
+  const d = dataFor(b);
+  const start = d.start ? new Date(d.start).getTime() : Date.now();
+  const baseDays = Number(payload.days);
+  const add = Number(payload.extendDays||0);
+  const end = new Date(start + (baseDays + add)*86400000).toISOString();
+  if (phase==='F1') Object.assign(next,{f1Days:baseDays+add,f1EndAt:end,f1Notes:payload.notes||'',f1Liters:payload.liters||'',f1TeaGrams:payload.teaGrams||'',f1SugarGrams:payload.sugarGrams||'',liters:payload.liters||'',teaGrams:payload.teaGrams||'',sugarGrams:payload.sugarGrams||''});
+  else Object.assign(next,{f2Days:baseDays+add,f2EndAt:end,f2Notes:payload.notes||'',liters:payload.liters||'',teaGrams:payload.teaGrams||'',sugarGrams:payload.sugarGrams||'',flavor:payload.flavor||''});
+  return next;
+}
+
+$('addBtn').addEventListener('click', openAdd);
+$('refreshBtn').addEventListener('click', async ()=>{ await syncQueue({silent:false}); await refreshFromServer({silent:false}); });
+document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>page(b.dataset.page)));
+document.querySelectorAll('[data-close-modal]').forEach(b=>b.addEventListener('click', closeAllModals));
+document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)hide(m.id)}));
+
+document.addEventListener('click', async e=>{
+  const ext = e.target.closest('.extend-btn');
+  if (ext) {
+    const wrap = ext.closest('.extend-options');
+    wrap.querySelectorAll('.extend-btn').forEach(b=>b.classList.remove('active'));
+    ext.classList.add('active');
+    $(wrap.dataset.target).value = ext.dataset.add;
+    return;
+  }
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const a = el.dataset.action, id=el.dataset.id;
+  if (a==='f2') return openF2(id);
+  if (a==='edit') return openEdit(id);
+  if (a==='delete') {
+    const b=state.batches.find(x=>x.id===id); if(!b) return;
+    if (!confirm(`Supprimer définitivement « ${b.name} » ?`)) return;
+    removeLocal(id); queueOp('deleteBatch',{id}); toast('Batch supprimé de cet appareil. Synchronisation en cours.', 'warn'); return;
+  }
+  if (a==='rate') {
+    const rating=Number(el.dataset.rating);
+    const b=state.batches.find(x=>x.id===id); if(!b)return;
+    upsertLocal({...b,rating,ratingEmoji:faces[rating-1]});
+    queueOp('rate',{id,rating});
+    toast('Note enregistrée.');
+  }
+});
+
+$('batchForm').addEventListener('submit', async e=>{
+  e.preventDefault(); const btn=e.submitter; btn.disabled=true;
+  const payload={id:$('batchId').value,name:$('batchName').value.trim(),f1Days:Number($('batchF1Days').value),liters:Number($('batchLiters').value||0),teaGrams:Number($('batchTeaGrams').value||0),sugarGrams:Number($('batchSugarGrams').value||0),f1Notes:$('batchNotes').value.trim()};
+  try { const b=buildOptimisticF1(payload); upsertLocal(b); queueOp('createF1',payload); hide('batchModal'); toast('Batch créé. Il sera synchronisé en arrière-plan.'); }
+  catch(err){toast(err.message,'warn')} finally {btn.disabled=false;}
+});
+
+$('f2Form').addEventListener('submit', async e=>{
+  e.preventDefault(); const btn=e.submitter; btn.disabled=true;
+  const id=$('f2BatchId').value, b=state.batches.find(x=>x.id===id); if(!b){btn.disabled=false;return;}
+  const payload={id,f2Days:Number($('f2Days').value),flavor:$('f2Flavor').value.trim(),f2Notes:$('f2Notes').value.trim(),extendDays:Number($('f2ExtendDays').value||0)};
+  try { upsertLocal(optimisticStartF2(b,payload)); queueOp('startF2',payload); hide('f2Modal'); toast('F2 démarrée. Synchronisation en arrière-plan.'); }
+  catch(err){toast(err.message,'warn')} finally{btn.disabled=false;}
+});
+
+$('editForm').addEventListener('submit', async e=>{
+  e.preventDefault(); const btn=e.submitter; btn.disabled=true;
+  const id=$('editId').value,b=state.batches.find(x=>x.id===id); if(!b){btn.disabled=false;return;}
+  const payload={id,phase:$('editPhase').value,name:$('editName').value.trim(),days:Number($('editDays').value),liters:Number($('editLiters').value||0),teaGrams:Number($('editTeaGrams').value||0),sugarGrams:Number($('editSugarGrams').value||0),flavor:$('editFlavor').value.trim(),notes:$('editNotes').value.trim(),extendDays:Number($('editExtendDays').value||0)};
+  try { upsertLocal(optimisticUpdate(b,payload)); queueOp('updateBatch',payload); hide('editModal'); toast('Modifications enregistrées localement.'); }
+  catch(err){toast(err.message,'warn')} finally{btn.disabled=false;}
+});
+
+$('settingsForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const defaultF1=Number($('defaultF1').value), defaultF2=Number($('defaultF2').value);
+  state.settings={defaultF1,defaultF2}; persist();
+  queueOp('saveSettings',{defaultF1,defaultF2}); toast('Paramètres enregistrés localement.');
+});
+
+window.addEventListener('online',()=>{ setSyncStatus('Connexion retrouvée · synchronisation…','info'); syncQueue({silent:false}); });
+window.addEventListener('offline',()=>setSyncStatus('Mode local · hors connexion','warn'));
+window.addEventListener('beforeunload',persist);
+
+document.addEventListener('keydown', e=>{if(e.key==='Escape')closeAllModals()});
+
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.deferredPrompt=e;$('installBtn').classList.remove('hidden')});
+$('installBtn').addEventListener('click',async()=>{if(!state.deferredPrompt)return;state.deferredPrompt.prompt();await state.deferredPrompt.userChoice;state.deferredPrompt=null;$('installBtn').classList.add('hidden')});
+
+if('serviceWorker' in navigator) window.addEventListener('load',async()=>{try{const regs=await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r=>r.update())); await navigator.serviceWorker.register('./sw.js?v=6')}catch(_){}});
+
+loadLocal();
+$('defaultF1').value=state.settings.defaultF1;
+$('defaultF2').value=state.settings.defaultF2;
+render();
+ticks();
+setSyncStatus(state.queue.length ? 'Données locales · synchronisation en attente' : (navigator.onLine ? 'Chargement des données…' : 'Mode local · hors connexion'), state.queue.length ? 'warn' : 'info');
+if (navigator.onLine) {
+  (async()=>{ await syncQueue({silent:true}); await refreshFromServer({silent:false}); })();
+}
+setInterval(ticks,60000);
+setInterval(()=>syncQueue({silent:true}),30000);

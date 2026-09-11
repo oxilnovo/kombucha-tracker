@@ -3,45 +3,39 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#6b4734">
-  <meta name="description" content="Suivi partagé des fermentations de kombucha">
+  <meta name="theme-color" content="#70503e">
+  <meta name="description" content="Kombucha Tracker — suivi partagé des fermentations">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=3">
-  <title>Kombucha Keeper</title>
+  <link rel="stylesheet" href="styles.css?v=6">
+  <title>Kombucha Tracker</title>
 </head>
 <body>
   <header class="hero">
-    <div class="hero-title">KOMBUCHA KEEPER</div>
+    <div class="hero-title">KOMBUCHA TRACKER</div>
     <button id="installBtn" class="install-btn hidden" type="button">Installer</button>
   </header>
 
   <main class="app-main">
-    <div id="connectionBanner" class="banner info">Connexion aux données…</div>
+    <div id="connectionBanner" class="banner info">Chargement des données…</div>
 
     <section id="page-active" class="page active-page">
       <div class="section-heading">
-        <div>
-          <div class="eyebrow">EN COURS</div>
-          <h1>Mes batchs</h1>
-        </div>
-        <button id="refreshBtn" class="refresh-btn" type="button" aria-label="Actualiser">↻</button>
+        <div><div class="eyebrow">EN COURS</div><h1>Mes batchs</h1></div>
+        <button id="refreshBtn" class="refresh-btn" type="button" aria-label="Synchroniser">↻</button>
       </div>
       <div id="activeList" class="batch-list"></div>
     </section>
 
     <section id="page-completed" class="page">
-      <div class="section-heading">
-        <div><div class="eyebrow">HISTORIQUE</div><h1>Batchs terminés</h1></div>
-      </div>
+      <div class="section-heading"><div><div class="eyebrow">HISTORIQUE</div><h1>Batchs terminés</h1></div></div>
       <div id="completedList" class="batch-list"></div>
     </section>
 
     <section id="page-settings" class="page">
-      <div class="section-heading">
-        <div><div class="eyebrow">PARAMÈTRES</div><h1>Settings</h1></div>
-      </div>
+      <div class="section-heading"><div><div class="eyebrow">PARAMÈTRES</div><h1>Settings</h1></div></div>
       <div class="settings-card">
+        <p class="settings-note">Ces durées sont utilisées automatiquement lors de la création d'une nouvelle fermentation.</p>
         <form id="settingsForm" class="settings-form">
           <label><span>Durée par défaut — F1</span><div class="input-unit"><input id="defaultF1" type="number" min="1" max="365" step="1" required><b>jours</b></div></label>
           <label><span>Durée par défaut — F2</span><div class="input-unit"><input id="defaultF2" type="number" min="1" max="60" step="1" required><b>jours</b></div></label>
@@ -52,9 +46,14 @@
   </main>
 
   <nav class="bottom-nav" aria-label="Navigation">
-    <button class="nav-btn active" data-page="active"><span class="nav-icon">⌂</span><small>Mes batchs</small></button>
-    <button class="nav-btn" data-page="completed"><span class="nav-icon">▣</span><small>Terminés</small></button>
-    <button class="nav-btn" data-page="settings"><span class="nav-icon">⚙</span><small>Settings</small></button>
+    <div class="nav-side">
+      <button class="nav-btn active" data-page="active"><span class="nav-icon">⌂</span><small>Mes batchs</small></button>
+    </div>
+    <div class="nav-fab-slot" aria-hidden="true"></div>
+    <div class="nav-side">
+      <button class="nav-btn" data-page="completed"><span class="nav-icon">▣</span><small>Terminés</small></button>
+    </div>
+    <button class="nav-btn settings-nav" data-page="settings"><span class="nav-icon">⚙</span><small>Settings</small></button>
   </nav>
   <button id="addBtn" class="fab-add" type="button" aria-label="Ajouter un batch"><span>+</span><small>1</small></button>
 
@@ -62,15 +61,16 @@
 
   <div id="batchModal" class="modal hidden" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="batchModalTitle">
-      <div class="modal-header"><div><div class="eyebrow">NOUVEAU BATCH</div><h2 id="batchModalTitle">Créer un batch</h2></div><button id="closeBatchModal" class="icon-btn" type="button">×</button></div>
+      <div class="modal-header"><div><div class="eyebrow">NOUVEAU BATCH</div><h2 id="batchModalTitle">Créer une F1</h2></div><button class="icon-btn" data-close-modal type="button" aria-label="Fermer">×</button></div>
       <form id="batchForm" class="form-grid">
-        <input id="batchId" type="hidden"><input id="batchPhase" type="hidden" value="F1">
-        <label><span>Nom</span><input id="batchName" required maxlength="80" placeholder="Ex. Gingembre #12"></label>
+        <input id="batchId" type="hidden">
+        <label><span>Nom</span><input id="batchName" required maxlength="80"></label>
         <label><span>Durée F1</span><div class="input-unit"><input id="batchF1Days" type="number" min="1" max="365" step="1" required><b>jours</b></div></label>
         <label><span>Litres</span><div class="input-unit"><input id="batchLiters" type="number" min="0.1" max="500" step="0.1" placeholder="2"><b>L</b></div></label>
         <label><span>Thé</span><div class="input-unit"><input id="batchTeaGrams" type="number" min="0" max="10000" step="1" placeholder="20"><b>g</b></div></label>
         <label><span>Sucre</span><div class="input-unit"><input id="batchSugarGrams" type="number" min="0" max="10000" step="1" placeholder="120"><b>g</b></div></label>
         <label class="wide"><span>Notes</span><textarea id="batchNotes" maxlength="500" placeholder="Observations, conditions, recette…"></textarea></label>
+        <input id="batchExtendDays" type="hidden" value="0">
         <div class="wide actions"><button class="primary-btn full" type="submit" id="batchSubmit">Démarrer la F1</button></div>
       </form>
     </div>
@@ -78,16 +78,14 @@
 
   <div id="f2Modal" class="modal hidden" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="f2ModalTitle">
-      <div class="modal-header"><div><div class="eyebrow">DEUXIÈME FERMENTATION</div><h2 id="f2ModalTitle">Passer en F2</h2></div><button id="closeF2Modal" class="icon-btn" type="button">×</button></div>
+      <div class="modal-header"><div><div class="eyebrow">DEUXIÈME FERMENTATION</div><h2 id="f2ModalTitle">Passer en F2</h2></div><button class="icon-btn" data-close-modal type="button" aria-label="Fermer">×</button></div>
       <form id="f2Form" class="form-grid">
         <input id="f2BatchId" type="hidden">
         <label><span>Durée F2</span><div class="input-unit"><input id="f2Days" type="number" min="1" max="60" step="1" required><b>jours</b></div></label>
-        <label><span>Litres</span><div class="input-unit"><input id="f2Liters" type="number" min="0.1" max="500" step="0.1" required><b>L</b></div></label>
-        <label><span>Thé</span><div class="input-unit"><input id="f2TeaGrams" type="number" min="0" max="10000" step="1"><b>g</b></div></label>
-        <label><span>Sucre</span><div class="input-unit"><input id="f2SugarGrams" type="number" min="0" max="10000" step="1"><b>g</b></div></label>
         <label><span>Parfum</span><input id="f2Flavor" maxlength="120" placeholder="Ex. gingembre-citron"></label>
-        <label><span>Prolonger de</span><div class="input-unit"><input id="f2ExtendDays" type="number" min="0" max="60" step="1" value="0"><b>jours</b></div></label>
         <label class="wide"><span>Notes</span><textarea id="f2Notes" maxlength="500" placeholder="Mise en bouteille, parfum, température…"></textarea></label>
+        <input id="f2ExtendDays" type="hidden" value="0">
+        <div class="wide extension-panel"><span class="extension-title">Prolonger dès maintenant</span><div class="extend-options" data-target="f2ExtendDays"><button type="button" data-add="0" class="extend-btn active">Aucune</button><button type="button" data-add="1" class="extend-btn">+1 jour</button><button type="button" data-add="2" class="extend-btn">+2 jours</button><button type="button" data-add="3" class="extend-btn">+3 jours</button><button type="button" data-add="7" class="extend-btn">+1 semaine</button></div></div>
         <div class="wide actions"><button class="primary-btn full" type="submit">Démarrer la F2</button></div>
       </form>
     </div>
@@ -95,16 +93,15 @@
 
   <div id="editModal" class="modal hidden" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
-      <div class="modal-header"><div><div class="eyebrow">MODIFIER</div><h2 id="editModalTitle">Modifier le batch</h2></div><button id="closeEditModal" class="icon-btn" type="button">×</button></div>
+      <div class="modal-header"><div><div class="eyebrow">MODIFIER</div><h2 id="editModalTitle">Modifier le batch</h2></div><button class="icon-btn" data-close-modal type="button" aria-label="Fermer">×</button></div>
       <form id="editForm" class="form-grid">
         <input id="editId" type="hidden"><input id="editPhase" type="hidden">
         <label><span>Nom</span><input id="editName" required maxlength="80"></label>
         <label><span>Durée</span><div class="input-unit"><input id="editDays" type="number" min="1" max="365" required><b>jours</b></div></label>
-        <label><span>Litres</span><div class="input-unit"><input id="editLiters" type="number" min="0.1" max="500" step="0.1"><b>L</b></div></label>
-        <label><span>Thé</span><div class="input-unit"><input id="editTeaGrams" type="number" min="0" max="10000" step="1"><b>g</b></div></label>
-        <label><span>Sucre</span><div class="input-unit"><input id="editSugarGrams" type="number" min="0" max="10000" step="1"><b>g</b></div></label>
-        <label id="editFlavorWrap"><span>Parfum</span><input id="editFlavor" maxlength="120"></label>
-        <label class="wide"><span>Prolonger de</span><div class="input-unit"><input id="editExtendDays" type="number" min="0" max="365" step="1" value="0"><b>jours</b></div></label>
+        <div id="editMaterialWrap" class="wide material-row"><label><span>Litres</span><div class="input-unit"><input id="editLiters" type="number" min="0.1" max="500" step="0.1"><b>L</b></div></label><label><span>Thé</span><div class="input-unit"><input id="editTeaGrams" type="number" min="0" max="10000" step="1"><b>g</b></div></label><label><span>Sucre</span><div class="input-unit"><input id="editSugarGrams" type="number" min="0" max="10000" step="1"><b>g</b></div></label></div>
+        <label id="editFlavorWrap" class="wide"><span>Parfum</span><input id="editFlavor" maxlength="120"></label>
+        <input id="editExtendDays" type="hidden" value="0">
+        <div class="wide extension-panel"><span class="extension-title">Prolonger la fermentation</span><div class="extend-options" data-target="editExtendDays"><button type="button" data-add="0" class="extend-btn active">Aucune</button><button type="button" data-add="1" class="extend-btn">+1 jour</button><button type="button" data-add="2" class="extend-btn">+2 jours</button><button type="button" data-add="3" class="extend-btn">+3 jours</button><button type="button" data-add="7" class="extend-btn">+1 semaine</button></div></div>
         <label class="wide"><span>Notes</span><textarea id="editNotes" maxlength="500"></textarea></label>
         <div class="wide actions"><button class="primary-btn full" type="submit">Enregistrer</button></div>
       </form>
@@ -112,6 +109,6 @@
   </div>
 
   <div id="toast" class="toast" aria-live="polite"></div>
-  <script src="config.js"></script><script src="app.js?v=3"></script>
+  <script src="config.js"></script><script src="app.js?v=6"></script>
 </body>
 </html>
