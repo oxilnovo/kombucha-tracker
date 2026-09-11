@@ -7,7 +7,7 @@
   <meta name="description" content="Kombucha Tracker — suivi partagé des fermentations">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=9">
+  <link rel="stylesheet" href="styles.css?v=11">
   <title>Kombucha Tracker</title>
 </head>
 <body>
@@ -65,7 +65,7 @@
         <label><span>Thé</span><div class="input-unit"><input id="batchTeaGrams" type="number" min="0" max="10000" step="1" placeholder="20"><b>g</b></div></label>
         <label><span>Sucre</span><div class="input-unit"><input id="batchSugarGrams" type="number" min="0" max="10000" step="1" placeholder="120"><b>g</b></div></label>
         <label class="wide"><span>Notes</span><textarea id="batchNotes" maxlength="500" placeholder="Observations, conditions, recette…"></textarea></label>
-        <div class="wide extension-panel"><span class="extension-title">Ajuster la durée</span><div class="wheel-picker" data-target="batchExtendDays" data-min="-14" data-max="30" data-value="0"></div><input id="batchExtendDays" type="hidden" value="0"><div class="wheel-value" data-for="batchExtendDays">Aucun changement</div></div>
+        
         <div class="wide actions"><button class="primary-btn full" type="submit" id="batchSubmit">Démarrer la F1</button></div>
       </form>
     </div>
@@ -79,7 +79,7 @@
         <label><span>Durée F2</span><div class="input-unit"><input id="f2Days" type="number" min="1" max="60" step="1" required><b>jours</b></div></label>
         <label><span>Parfum</span><input id="f2Flavor" maxlength="120" placeholder="Ex. gingembre-citron"></label>
         <label class="wide"><span>Notes</span><textarea id="f2Notes" maxlength="500" placeholder="Mise en bouteille, parfum, température…"></textarea></label>
-        <div class="wide extension-panel"><span class="extension-title">Ajuster la durée</span><div class="wheel-picker" data-target="f2ExtendDays" data-min="-14" data-max="30" data-value="0"></div><input id="f2ExtendDays" type="hidden" value="0"><div class="wheel-value" data-for="f2ExtendDays">Aucun changement</div></div>
+        
         <div class="wide actions"><button class="primary-btn full" type="submit">Démarrer la F2</button></div>
       </form>
     </div>
@@ -94,7 +94,7 @@
         <label><span>Durée</span><div class="input-unit"><input id="editDays" type="number" min="1" max="365" required><b>jours</b></div></label>
         <div id="editMaterialWrap" class="wide material-row"><label><span>Litres</span><div class="input-unit"><input id="editLiters" type="number" min="0.1" max="500" step="0.1"><b>L</b></div></label><label><span>Thé</span><div class="input-unit"><input id="editTeaGrams" type="number" min="0" max="10000" step="1"><b>g</b></div></label><label><span>Sucre</span><div class="input-unit"><input id="editSugarGrams" type="number" min="0" max="10000" step="1"><b>g</b></div></label></div>
         <label id="editFlavorWrap" class="wide"><span>Parfum</span><input id="editFlavor" maxlength="120"></label>
-        <div class="wide extension-panel"><span class="extension-title">Ajuster la durée</span><div class="wheel-picker" data-target="editExtendDays" data-min="-14" data-max="30" data-value="0"></div><input id="editExtendDays" type="hidden" value="0"><div class="wheel-value" data-for="editExtendDays">Aucun changement</div></div>
+        <div class="wide extension-panel"><span class="extension-title">Ajuster la durée</span><div class="extend-options" data-target="editExtendDays"><button type="button" class="extend-btn" data-value="-3">−3 j</button><button type="button" class="extend-btn" data-value="-1">−1 j</button><button type="button" class="extend-btn active" data-value="0">0</button><button type="button" class="extend-btn" data-value="1">+1 j</button><button type="button" class="extend-btn" data-value="3">+3 j</button><button type="button" class="extend-btn" data-value="7">+7 j</button></div><input id="editExtendDays" type="hidden" value="0"><div class="wheel-value" data-for="editExtendDays">Aucun changement</div></div>
         <label class="wide"><span>Notes</span><textarea id="editNotes" maxlength="500"></textarea></label>
         <div class="wide actions edit-actions"><button id="editToF2" class="secondary-action full" type="button">Passer en F2</button><button class="primary-btn full" type="submit">Enregistrer</button></div>
       </form>
@@ -102,6 +102,6 @@
   </div>
 
   <div id="toast" class="toast" aria-live="polite"></div>
-  <script src="config.js"></script><script src="app.js?v=8"></script>
+  <script src="config.js"></script><script src="app.js?v=11"></script>
 </body>
 </html>

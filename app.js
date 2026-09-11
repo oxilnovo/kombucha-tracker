@@ -164,7 +164,7 @@ function card(b, done) {
     b.sugarGrams !== '' && b.sugarGrams != null ? `<span class="mini-tag">Sucre <strong>${esc(b.sugarGrams)}g</strong></span>` : ''
   ] : [b.flavor ? `<span class="mini-tag">${esc(b.flavor)}</span>` : '']).filter(Boolean).join('');
   const actions = `<div class="card-actions">
-    ${!done && b.phase === 'F1' ? `<button class="secondary-action" data-action="f2" data-id="${esc(b.id)}">Passer en F2</button>` : ''}
+    ${!done && b.phase === 'F1' ? `<button class="secondary-action" data-action="f2" data-id="${esc(b.id)}">Passer en F2</button>` : ''}${!done && b.phase === 'F2' ? `<button class="secondary-action complete-action" data-action="complete" data-id="${esc(b.id)}">Terminer F2</button>` : ''}
     <button class="icon-action edit-action" data-action="edit" data-id="${esc(b.id)}" aria-label="Modifier"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 17.5-.8 3.3 3.3-.8L18.8 7.7a2.1 2.1 0 0 0 0-3l-.5-.5a2.1 2.1 0 0 0-3 0L4 17.5Z"/><path d="m13.8 5.8 4.4 4.4"/></svg></button>
     <button class="icon-action delete-action" data-action="delete" data-id="${esc(b.id)}" aria-label="Supprimer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg></button>
   </div>`;
@@ -219,28 +219,11 @@ function show(id){const el=$(id);el.classList.remove('hidden');el.setAttribute('
 function hide(id){const el=$(id);el.classList.add('hidden');el.setAttribute('aria-hidden','true');}
 function closeAllModals(){document.querySelectorAll('.modal').forEach(m=>hide(m.id));}
 
-function wheelLabel(v){ const n=Number(v); if(n===0)return 'Aucun changement'; return n>0?`+${n} ${n===1?'jour':'jours'}`:`${n} ${n===-1?'jour':'jours'}`; }
-function initWheels(){
-  document.querySelectorAll('.wheel-picker').forEach(w=>{
-    if(w.dataset.ready)return; w.dataset.ready='1';
-    const min=Number(w.dataset.min||-14), max=Number(w.dataset.max||30), target=w.dataset.target;
-    const values=[0,...Array.from({length:max},(_,i)=>i+1),...Array.from({length:Math.abs(min)},(_,i)=>-(i+1))];
-    for(const v of values){ const item=document.createElement('button'); item.type='button'; item.className='wheel-item'; item.dataset.value=v; item.textContent=v===0?'0':(v>0?`+${v}`:`${v}`); w.appendChild(item); }
-    w.addEventListener('scroll',()=>{ const center=w.scrollTop+w.clientHeight/2; let best=null,dist=Infinity; w.querySelectorAll('.wheel-item').forEach(el=>{const d=Math.abs(el.offsetTop+el.offsetHeight/2-center);if(d<dist){dist=d;best=el;}}); if(best)selectWheel(w,Number(best.dataset.value),false); });
-    w.addEventListener('click',e=>{const item=e.target.closest('.wheel-item');if(!item)return;selectWheel(w,Number(item.dataset.value),true);});
-    requestAnimationFrame(()=>selectWheel(w,0,false));
-  });
-}
-function selectWheel(w,value,scroll){ const item=w.querySelector(`[data-value="${value}"]`); if(!item)return; w.querySelectorAll('.wheel-item').forEach(x=>x.classList.toggle('selected',x===item)); const target=w.dataset.target, input=$(target); if(input)input.value=value; const out=document.querySelector(`.wheel-value[data-for="${target}"]`); if(out)out.textContent=wheelLabel(value); if(scroll)w.scrollTo({top:item.offsetTop-(w.clientHeight-item.offsetHeight)/2,behavior:'smooth'}); }
-function resetWheel(targetId){ const w=document.querySelector(`.wheel-picker[data-target="${targetId}"]`); if(w)selectWheel(w,0,true); }
-
 function openAdd() {
   $('batchForm').reset();
   $('batchId').value = crypto.randomUUID ? crypto.randomUUID() : `tmp-${Date.now()}`;
   $('batchName').value = new Date().toLocaleDateString('fr-FR');
   $('batchF1Days').value = state.settings.defaultF1;
-  $('batchExtendDays').value = 0;
-  resetWheel('batchExtendDays');
   $('batchModalTitle').textContent = 'Nouveau batch';
   show('batchModal');
   setTimeout(()=>$('batchName').focus(),50);
@@ -253,8 +236,6 @@ function openF2(id) {
   $('f2Days').value = state.settings.defaultF2;
   $('f2Flavor').value = '';
   $('f2Notes').value = '';
-  $('f2ExtendDays').value = 0;
-  resetWheel('f2ExtendDays');
   $('f2ModalTitle').textContent = `F2 · ${b.name}`;
   show('f2Modal');
 }
@@ -266,7 +247,7 @@ function openEdit(id) {
   $('editLiters').value=b.liters??''; $('editTeaGrams').value=b.teaGrams??''; $('editSugarGrams').value=b.sugarGrams??'';
   $('editFlavor').value=b.flavor||''; $('editNotes').value=b.phase==='F2'?(b.f2Notes||''):(b.f1Notes||''); $('editExtendDays').value=0;
   $('editFlavorWrap').style.display=b.phase==='F2'?'grid':'none'; $('editMaterialWrap').style.display=b.phase==='F2'?'none':'grid'; $('editToF2').style.display=b.phase==='F2'?'none':'block';
-  resetWheel('editExtendDays');
+  const eg=document.querySelector('.extend-options[data-target="editExtendDays"]'); if(eg)eg.querySelectorAll('.extend-btn').forEach(x=>x.classList.toggle('active',x.dataset.value==='0'));
   $('editModalTitle').textContent=`Modifier · ${b.name} · ${b.phase}`; show('editModal');
 }
 
@@ -298,12 +279,13 @@ function optimisticUpdate(b, payload) {
 }
 
 
-initWheels();
 $('addBtn').addEventListener('click', openAdd);
 $('refreshBtn').addEventListener('click', async ()=>{ await syncQueue({silent:false}); await refreshFromServer({silent:false}); });
 document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>page(b.dataset.page)));
 document.querySelectorAll('[data-close-modal]').forEach(b=>b.addEventListener('click', closeAllModals));
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)hide(m.id)}));
+
+document.querySelectorAll('.extend-options').forEach(group=>group.addEventListener('click',e=>{const b=e.target.closest('.extend-btn');if(!b)return;group.querySelectorAll('.extend-btn').forEach(x=>x.classList.toggle('active',x===b));const id=group.dataset.target;$(id).value=b.dataset.value;const out=document.querySelector(`.wheel-value[data-for="${id}"]`);if(out){const n=Number(b.dataset.value);out.textContent=n===0?'Aucun changement':(n>0?`+${n} ${n===1?'jour':'jours'}`:`${n} ${Math.abs(n)===1?'jour':'jours'}`)}}));
 
 document.addEventListener('click', async e=>{
   const el = e.target.closest('[data-action]');
@@ -311,6 +293,7 @@ document.addEventListener('click', async e=>{
   const a = el.dataset.action, id=el.dataset.id;
   if (a==='f2') return openF2(id);
   if (a==='edit') return openEdit(id);
+  if (a==='complete') { const b=state.batches.find(x=>x.id===id); if(!b || b.phase!=='F2') return; if(!confirm('Terminer cette F2 maintenant ?')) return; const now=new Date().toISOString(); upsertLocal({...b,status:'COMPLETED',completedAt:now,f2EndAt:now,updatedAt:now}); queueOp('completeBatch',{id}); toast('F2 terminée. Synchronisation en arrière-plan.'); return; }
   if (a==='delete') {
     const b=state.batches.find(x=>x.id===id); if(!b) return;
     if (!confirm(`Supprimer définitivement « ${b.name} » ?`)) return;
@@ -335,7 +318,7 @@ $('batchForm').addEventListener('submit', async e=>{
 $('f2Form').addEventListener('submit', async e=>{
   e.preventDefault(); const btn=e.submitter; btn.disabled=true;
   const id=$('f2BatchId').value, b=state.batches.find(x=>x.id===id); if(!b){btn.disabled=false;return;}
-  const payload={id,f2Days:Number($('f2Days').value),flavor:$('f2Flavor').value.trim(),f2Notes:$('f2Notes').value.trim(),extendDays:Number($('f2ExtendDays').value||0)};
+  const payload={id,f2Days:Number($('f2Days').value),flavor:$('f2Flavor').value.trim(),f2Notes:$('f2Notes').value.trim()};
   try { upsertLocal(optimisticStartF2(b,payload)); queueOp('startF2',payload); hide('f2Modal'); toast('F2 démarrée. Synchronisation en arrière-plan.'); }
   catch(err){toast(err.message,'warn')} finally{btn.disabled=false;}
 });
@@ -366,7 +349,7 @@ document.addEventListener('keydown', e=>{if(e.key==='Escape')closeAllModals()});
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.deferredPrompt=e;$('installBtn').classList.remove('hidden')});
 $('installBtn').addEventListener('click',async()=>{if(!state.deferredPrompt)return;state.deferredPrompt.prompt();await state.deferredPrompt.userChoice;state.deferredPrompt=null;$('installBtn').classList.add('hidden')});
 
-if('serviceWorker' in navigator) window.addEventListener('load',async()=>{try{const regs=await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r=>r.update())); await navigator.serviceWorker.register('./sw.js?v=7')}catch(_){}});
+if('serviceWorker' in navigator) window.addEventListener('load',async()=>{try{const regs=await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r=>r.update())); await navigator.serviceWorker.register('./sw.js?v=11')}catch(_){}});
 
 loadLocal();
 $('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;render();ticks();updateSyncBanner();
