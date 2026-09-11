@@ -3,8 +3,8 @@
   "short_name": "Kombucha",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#e6ebe0",
-  "theme_color": "#B3684A",
+  "background_color": "#E6EBE0",
+  "theme_color": "#FFD216",
   "description": "Suivi partagé des fermentations de kombucha",
   "icons": [
     {
@@ -16,6 +16,11 @@
       "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
     }
   ]
 }
