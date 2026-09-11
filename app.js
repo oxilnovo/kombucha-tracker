@@ -349,7 +349,7 @@ document.addEventListener('keydown', e=>{if(e.key==='Escape')closeAllModals()});
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.deferredPrompt=e;$('installBtn').classList.remove('hidden')});
 $('installBtn').addEventListener('click',async()=>{if(!state.deferredPrompt)return;state.deferredPrompt.prompt();await state.deferredPrompt.userChoice;state.deferredPrompt=null;$('installBtn').classList.add('hidden')});
 
-if('serviceWorker' in navigator) window.addEventListener('load',async()=>{try{const regs=await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r=>r.update())); await navigator.serviceWorker.register('./sw.js?v=11')}catch(_){}});
+if('serviceWorker' in navigator) window.addEventListener('load',async()=>{try{const regs=await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r=>r.update())); await navigator.serviceWorker.register('./sw.js?v=12')}catch(_){}});
 
 loadLocal();
 $('defaultF1').value=state.settings.defaultF1;$('defaultF2').value=state.settings.defaultF2;render();ticks();updateSyncBanner();
