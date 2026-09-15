@@ -207,6 +207,7 @@ function ticks() {
     const s = e.querySelector('.timer-hours');
     const cardEl = e.closest('.batch-card');
     const completedCard = cardEl?.classList.contains('is-done');
+    const text = cardEl?.querySelector('.countdown-text');
     if (completedCard) {
       if (d) d.innerHTML = '✓';
       if (s) s.textContent = 'terminé';
