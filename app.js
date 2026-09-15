@@ -181,7 +181,7 @@ function card(b, done) {
         <div class="card-meta">${tags || '<span class="muted-text">Aucun détail</span>'}</div>
       </div>
       <div class="timer-ring ${done || rawDiff <= 0 ? 'timer-done' : ''}" style="--pct:${pct}%" data-end="${esc(d.end)}">
-        <div class="timer-content"><div class="timer-days">${done || rawDiff <= 0 ? '✓' : daysLeft}<span class="timer-days-unit">${done || rawDiff <= 0 ? '' : 'j'}</span></div><div class="timer-hours">${done ? 'terminé' : rawDiff <= 0 ? `${String(Math.floor((elapsed % 86400000) / 3600000)).padStart(2,'0')} h` : String(Math.floor((left % 86400000) / 3600000)).padStart(2,'0') + ' h'}</div></div>
+        <div class="timer-content"><div class="timer-days">${done || rawDiff <= 0 ? '✓' : daysLeft}<span class="timer-days-unit">${done || rawDiff <= 0 ? '' : 'j'}</span></div><div class="timer-hours">${done ? 'terminé' : rawDiff <= 0 ? `${daysElapsed}j ${String(Math.floor((elapsed % 86400000) / 3600000)).padStart(2,'0')}h` : String(Math.floor((left % 86400000) / 3600000)).padStart(2,'0') + ' h'}</div></div>
       </div>
     </div>
     <div class="card-subrow"><span class="countdown-text">${done ? 'Fermentation terminée' : rawDiff <= 0 ? `Terminée depuis ${daysElapsed}j ${String(Math.floor((elapsed % 86400000) / 3600000)).padStart(2,'0')}h` : `Encore ${duration(left)}`}</span>${actions}</div>
@@ -214,7 +214,7 @@ function ticks() {
     } else if (done) {
       const elapsed = -diff;
       if (d) d.innerHTML = '✓';
-      if (s) s.textContent = `${String(Math.floor((elapsed % 86400000) / 3600000)).padStart(2,'0')} h`;
+      if (s) s.textContent = `${Math.floor(elapsed / 86400000)}j ${String(Math.floor((elapsed % 86400000) / 3600000)).padStart(2,'0')}h`;
       if (text) text.textContent = `Terminée depuis ${Math.floor(elapsed / 86400000)}j ${String(Math.floor((elapsed % 86400000) / 3600000)).padStart(2,'0')}h`;
     } else {
       if (d) d.innerHTML = `${Math.floor(diff / 86400000)}<span class="timer-days-unit">j</span>`;

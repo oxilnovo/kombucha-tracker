@@ -159,3 +159,8 @@ button:focus,button:active{outline:none}
   color:#5d4b00!important;
   background:transparent!important;
 }
+
+/* v26: overdue elapsed time inside the completion ring */
+.timer-done .timer-hours{font-size:10px;line-height:1.1;white-space:nowrap;margin-top:3px;font-weight:800;}
+.timer-done .timer-days{font-size:24px!important;line-height:1;}
+@media(max-width:640px){.timer-done .timer-hours{font-size:9px;}.timer-done .timer-days{font-size:21px!important;}}
