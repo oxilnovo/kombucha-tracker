@@ -154,9 +154,12 @@ async function refreshFromServer({silent=true}={}){if(!navigator.onLine||state.q
 function card(b, done) {
   const d = dataFor(b);
   const rating = Number(b.rating || 0);
-  const left = Math.max(0, new Date(d.end) - Date.now());
+  const rawDiff = new Date(d.end) - Date.now();
+  const left = Math.max(0, rawDiff);
+  const elapsed = Math.max(0, -rawDiff);
   const daysLeft = Math.max(0, Math.floor(left / 86400000));
-  const pct = ringPct(d.start, d.end, done);
+  const daysElapsed = Math.floor(elapsed / 86400000);
+  const pct = ringPct(d.start, d.end, done || rawDiff <= 0);
   const phaseClass = b.phase === 'F2' ? 'f2' : 'f1';
   const tags = (b.phase === 'F1' ? [
     b.liters !== '' && b.liters != null ? `<span class="mini-tag"><strong>${esc(b.liters)}</strong> L</span>` : '',
@@ -177,11 +180,11 @@ function card(b, done) {
         <p class="card-name"><strong>${date}</strong></p>
         <div class="card-meta">${tags || '<span class="muted-text">Aucun détail</span>'}</div>
       </div>
-      <div class="timer-ring ${done ? 'timer-done' : ''}" style="--pct:${pct}%" data-end="${esc(d.end)}">
-        <div class="timer-content"><div class="timer-days">${done ? '✓' : daysLeft}<span class="timer-days-unit">${done ? '' : 'j'}</span></div><div class="timer-hours">${done ? 'terminé' : String(Math.floor((left % 86400000) / 3600000)).padStart(2,'0') + ' h'}</div></div>
+      <div class="timer-ring ${done || rawDiff <= 0 ? 'timer-done' : ''}" style="--pct:${pct}%" data-end="${esc(d.end)}">
+        <div class="timer-content"><div class="timer-days">${done || rawDiff <= 0 ? '✓' : daysLeft}<span class="timer-days-unit">${done || rawDiff <= 0 ? '' : 'j'}</span></div><div class="timer-hours">${done ? 'terminé' : rawDiff <= 0 ? `${String(Math.floor((elapsed % 86400000) / 3600000)).padStart(2,'0')} h` : String(Math.floor((left % 86400000) / 3600000)).padStart(2,'0') + ' h'}</div></div>
       </div>
     </div>
-    <div class="card-subrow"><span class="countdown-text">${done ? 'Fermentation terminée' : `Encore ${duration(left)}`}</span>${actions}</div>
+    <div class="card-subrow"><span class="countdown-text">${done ? 'Fermentation terminée' : rawDiff <= 0 ? `Terminée depuis ${daysElapsed}j ${String(Math.floor((elapsed % 86400000) / 3600000)).padStart(2,'0')}h` : `Encore ${duration(left)}`}</span>${actions}</div>
     ${b.f1Notes && b.phase === 'F1' ? `<p class="card-note">${esc(b.f1Notes)}</p>` : ''}
     ${b.f2Notes && b.phase === 'F2' ? `<p class="card-note">${esc(b.f2Notes)}</p>` : ''}
     ${ratingHtml}
@@ -202,11 +205,21 @@ function ticks() {
     e.classList.toggle('timer-done', done);
     const d = e.querySelector('.timer-days');
     const s = e.querySelector('.timer-hours');
-    if (done) { if (d) d.innerHTML = '✓'; if (s) s.textContent = 'terminé'; }
-    else { if (d) d.innerHTML = `${Math.floor(diff / 86400000)}<span class="timer-days-unit">j</span>`; if (s) s.textContent = `${String(Math.floor((diff % 86400000) / 3600000)).padStart(2,'0')} h`; }
     const cardEl = e.closest('.batch-card');
-    const text = cardEl?.querySelector('.countdown-text');
-    if (text && !cardEl.classList.contains('is-done')) text.textContent = diff > 0 ? `Encore ${duration(diff)}` : 'Fermentation terminée';
+    const completedCard = cardEl?.classList.contains('is-done');
+    if (completedCard) {
+      if (d) d.innerHTML = '✓';
+      if (s) s.textContent = 'terminé';
+    } else if (done) {
+      const elapsed = -diff;
+      if (d) d.innerHTML = '✓';
+      if (s) s.textContent = `${String(Math.floor((elapsed % 86400000) / 3600000)).padStart(2,'0')} h`;
+      if (text) text.textContent = `Terminée depuis ${Math.floor(elapsed / 86400000)}j ${String(Math.floor((elapsed % 86400000) / 3600000)).padStart(2,'0')}h`;
+    } else {
+      if (d) d.innerHTML = `${Math.floor(diff / 86400000)}<span class="timer-days-unit">j</span>`;
+      if (s) s.textContent = `${String(Math.floor((diff % 86400000) / 3600000)).padStart(2,'0')} h`;
+      if (text) text.textContent = `Encore ${duration(diff)}`;
+    }
   });
 }
 
